@@ -1,16 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Word Puzzle Builder</title>
     <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
     <div class="container">
         <header>
             <h1>DuoTang</h1>
             <p class="subtitle">Puzzle Builder</p>
+            <a href="slot-puzzle.html"
+                style="position: absolute; top: 16px; right: 16px; color: var(--persian-green); text-decoration: none; font-weight: 700; font-size: 14px;">Slot
+                Puzzle →</a>
         </header>
 
         <main>
@@ -18,36 +23,46 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                     <h2 style="margin: 0;">Puzzle Stages</h2>
                     <div style="display: flex; gap: 8px; align-items: center;">
-                        <button id="btn-toggle-filters" class="btn btn-secondary" onclick="toggleGlobalFilters()">🔍 Filters</button>
+                        <button id="btn-toggle-filters" class="btn btn-secondary" onclick="toggleGlobalFilters()">🔍
+                            Filters</button>
                     </div>
                 </div>
 
-                <div id="global-filters" style="display: none; margin-bottom: 16px; padding: 12px; background: #fdf6e3; border: 3px solid var(--saffron); border-radius: 15px;">
-                    <div style="font-size: 13px; font-weight: 700; margin-bottom: 8px; color: var(--charcoal);">Filters (apply to all suggestions)</div>
+                <div id="global-filters"
+                    style="display: none; margin-bottom: 16px; padding: 12px; background: #fdf6e3; border: 3px solid var(--saffron); border-radius: 15px;">
+                    <div style="font-size: 13px; font-weight: 700; margin-bottom: 8px; color: var(--charcoal);">Filters
+                        (apply to all suggestions)</div>
                     <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 12px; max-width: 400px;">
                         <div style="flex: 1;">
-                            <label style="font-size: 12px; color: var(--charcoal); font-weight: 600;">Min Length:</label>
+                            <label style="font-size: 12px; color: var(--charcoal); font-weight: 600;">Min
+                                Length:</label>
                             <input type="number" id="global-min-length" value="2" min="1" max="20"
                                 style="width: 100%; padding: 6px 8px; font-size: 13px; border: 3px solid var(--persian-green); border-radius: 8px; font-weight: 600;">
                         </div>
                         <div style="flex: 1;">
-                            <label style="font-size: 12px; color: var(--charcoal); font-weight: 600;">Max Length:</label>
+                            <label style="font-size: 12px; color: var(--charcoal); font-weight: 600;">Max
+                                Length:</label>
                             <input type="number" id="global-max-length" value="10" min="1" max="20"
                                 style="width: 100%; padding: 6px 8px; font-size: 13px; border: 3px solid var(--persian-green); border-radius: 8px; font-weight: 600;">
                         </div>
                     </div>
                     <div style="max-width: 600px; margin-bottom: 12px;">
-                        <label style="font-size: 12px; color: var(--charcoal); font-weight: 600;">Ignore Words (comma-separated):</label>
+                        <label style="font-size: 12px; color: var(--charcoal); font-weight: 600;">Ignore Words
+                            (comma-separated):</label>
                         <input type="text" id="global-ignore-words" placeholder="e.g., the, and, but"
                             style="width: 100%; padding: 6px 8px; font-size: 13px; border: 3px solid var(--persian-green); border-radius: 8px; font-weight: 600;">
-                        <div style="font-size: 11px; color: #666; margin-top: 4px;">These words will be excluded from all suggestions</div>
+                        <div style="font-size: 11px; color: #666; margin-top: 4px;">These words will be excluded from
+                            all suggestions</div>
                     </div>
                     <div style="max-width: 600px;">
-                        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--charcoal); font-weight: 600; cursor: pointer;">
-                            <input type="checkbox" id="use-expanded-wordlist" onchange="toggleWordList()" style="cursor: pointer;">
+                        <label
+                            style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--charcoal); font-weight: 600; cursor: pointer;">
+                            <input type="checkbox" id="use-expanded-wordlist" onchange="toggleWordList()"
+                                style="cursor: pointer;">
                             <span>Use Expanded Word List (~6,800 words)</span>
                         </label>
-                        <div style="font-size: 11px; color: #666; margin-top: 4px; margin-left: 24px;">Includes abstract nouns and less common words. Default uses filtered list (~5,600 concrete nouns).</div>
+                        <div style="font-size: 11px; color: #666; margin-top: 4px; margin-left: 24px;">Includes abstract
+                            nouns and less common words. Default uses filtered list (~5,600 concrete nouns).</div>
                     </div>
                 </div>
 
@@ -55,11 +70,14 @@
                     <!-- Dynamically populated stages will go here -->
                 </div>
 
-                <div style="margin: 20px 0; padding: 12px; background: #f5f5f5; border: 2px solid #e0e0e0; border-radius: 8px; text-align: center; display: flex; flex-direction: column; gap: 8px; align-items: center;">
-                    <button id="btn-auto-generate" class="btn btn-secondary" onclick="autoGeneratePuzzle()" style="font-size: 13px; padding: 6px 16px;">
+                <div
+                    style="margin: 20px 0; padding: 12px; background: #f5f5f5; border: 2px solid #e0e0e0; border-radius: 8px; text-align: center; display: flex; flex-direction: column; gap: 8px; align-items: center;">
+                    <button id="btn-auto-generate" class="btn btn-secondary" onclick="autoGeneratePuzzle()"
+                        style="font-size: 13px; padding: 6px 16px;">
                         Auto Generate Puzzle
                     </button>
-                    <button class="btn btn-secondary" onclick="clearSourceWords()" style="font-size: 13px; padding: 6px 16px; margin-left: 8px;">
+                    <button class="btn btn-secondary" onclick="clearSourceWords()"
+                        style="font-size: 13px; padding: 6px 16px; margin-left: 8px;">
                         Clear Source Words
                     </button>
                     <label style="display: inline-flex; gap: 6px; align-items: center; font-size: 12px; color: #555;">
@@ -77,37 +95,66 @@
                     <div id="summary-content"></div>
                 </div>
 
-                <div id="word-browser" style="display: none; margin-top: 24px; padding: 16px; background: #f9f9f9; border: 2px solid var(--persian-green); border-radius: 12px;">
+                <div id="word-browser"
+                    style="display: none; margin-top: 24px; padding: 16px; background: #f9f9f9; border: 2px solid var(--persian-green); border-radius: 12px;">
                     <h3 style="margin: 0 0 12px 0; color: var(--charcoal);">Word Browser</h3>
                     <div id="browser-letters"></div>
 
-                    <div style="margin: 12px 0; padding: 12px; background: #fff; border: 2px solid #e0e0e0; border-radius: 8px;">
+                    <div
+                        style="margin: 12px 0; padding: 12px; background: #fff; border: 2px solid #e0e0e0; border-radius: 8px;">
                         <div style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;">
                             <div style="flex: 0 0 100px;">
-                                <label style="font-size: 12px; color: var(--charcoal); font-weight: 600; display: block; margin-bottom: 4px;">Min Length:</label>
+                                <label
+                                    style="font-size: 12px; color: var(--charcoal); font-weight: 600; display: block; margin-bottom: 4px;">Min
+                                    Length:</label>
                                 <input type="number" id="browser-min-length" value="2" min="1" max="20"
                                     style="width: 100%; padding: 6px 8px; font-size: 13px; border: 2px solid var(--persian-green); border-radius: 8px; font-weight: 600;">
                             </div>
                             <div style="flex: 0 0 100px;">
-                                <label style="font-size: 12px; color: var(--charcoal); font-weight: 600; display: block; margin-bottom: 4px;">Max Length:</label>
+                                <label
+                                    style="font-size: 12px; color: var(--charcoal); font-weight: 600; display: block; margin-bottom: 4px;">Max
+                                    Length:</label>
                                 <input type="number" id="browser-max-length" value="10" min="1" max="20"
                                     style="width: 100%; padding: 6px 8px; font-size: 13px; border: 2px solid var(--persian-green); border-radius: 8px; font-weight: 600;">
                             </div>
                             <div style="flex: 0 0 120px;">
-                                <label style="font-size: 12px; color: var(--charcoal); font-weight: 600; display: block; margin-bottom: 4px;">First Letter:</label>
-                                <select id="browser-first-letter" style="width: 100%; padding: 6px 8px; font-size: 13px; border: 2px solid var(--persian-green); border-radius: 8px; font-weight: 600;">
+                                <label
+                                    style="font-size: 12px; color: var(--charcoal); font-weight: 600; display: block; margin-bottom: 4px;">First
+                                    Letter:</label>
+                                <select id="browser-first-letter"
+                                    style="width: 100%; padding: 6px 8px; font-size: 13px; border: 2px solid var(--persian-green); border-radius: 8px; font-weight: 600;">
                                     <option value="">All</option>
-                                    <option value="a">A</option><option value="b">B</option><option value="c">C</option><option value="d">D</option>
-                                    <option value="e">E</option><option value="f">F</option><option value="g">G</option><option value="h">H</option>
-                                    <option value="i">I</option><option value="j">J</option><option value="k">K</option><option value="l">L</option>
-                                    <option value="m">M</option><option value="n">N</option><option value="o">O</option><option value="p">P</option>
-                                    <option value="q">Q</option><option value="r">R</option><option value="s">S</option><option value="t">T</option>
-                                    <option value="u">U</option><option value="v">V</option><option value="w">W</option><option value="x">X</option>
-                                    <option value="y">Y</option><option value="z">Z</option>
+                                    <option value="a">A</option>
+                                    <option value="b">B</option>
+                                    <option value="c">C</option>
+                                    <option value="d">D</option>
+                                    <option value="e">E</option>
+                                    <option value="f">F</option>
+                                    <option value="g">G</option>
+                                    <option value="h">H</option>
+                                    <option value="i">I</option>
+                                    <option value="j">J</option>
+                                    <option value="k">K</option>
+                                    <option value="l">L</option>
+                                    <option value="m">M</option>
+                                    <option value="n">N</option>
+                                    <option value="o">O</option>
+                                    <option value="p">P</option>
+                                    <option value="q">Q</option>
+                                    <option value="r">R</option>
+                                    <option value="s">S</option>
+                                    <option value="t">T</option>
+                                    <option value="u">U</option>
+                                    <option value="v">V</option>
+                                    <option value="w">W</option>
+                                    <option value="x">X</option>
+                                    <option value="y">Y</option>
+                                    <option value="z">Z</option>
                                 </select>
                             </div>
                             <div style="flex: 0 0 auto;">
-                                <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--charcoal); font-weight: 600; cursor: pointer;">
+                                <label
+                                    style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--charcoal); font-weight: 600; cursor: pointer;">
                                     <input type="checkbox" id="browser-sort-alpha" style="cursor: pointer;">
                                     <span>Sort Alphabetically</span>
                                 </label>
@@ -118,8 +165,10 @@
                     <div style="margin: 12px 0; display: flex; gap: 8px;">
                         <button class="btn btn-secondary" onclick="browseWords('single')">Browse Single Words</button>
                         <button class="btn btn-secondary" onclick="browseWords('combo')">Browse Combinations</button>
-                        <button class="btn btn-secondary btn-small" onclick="applyBrowserFilters()" style="padding: 6px 12px;">Apply Filters</button>
-                        <button class="btn btn-secondary btn-small" onclick="hideBrowserResults()" style="padding: 6px 12px;">Hide Results</button>
+                        <button class="btn btn-secondary btn-small" onclick="applyBrowserFilters()"
+                            style="padding: 6px 12px;">Apply Filters</button>
+                        <button class="btn btn-secondary btn-small" onclick="hideBrowserResults()"
+                            style="padding: 6px 12px;">Hide Results</button>
                     </div>
                     <div id="browser-results" class="suggestions-list" style="display: none;"></div>
                 </div>
@@ -130,4 +179,5 @@
     <script src="words.js"></script>
     <script src="app.js"></script>
 </body>
+
 </html>

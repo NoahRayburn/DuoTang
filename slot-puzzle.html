@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slot Type Puzzle Builder</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>DuoTang</h1>
+            <p class="subtitle">Slot Type Puzzle Builder</p>
+            <a href="index.html"
+                style="position: absolute; top: 16px; left: 16px; color: var(--persian-green); text-decoration: none; font-weight: 700; font-size: 14px;">←
+                Original Puzzle</a>
+        </header>
+
+        <main>
+            <section id="slot-puzzle-config">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <h2 style="margin: 0; color: var(--charcoal);">Slot Type Puzzle</h2>
+                </div>
+
+                <!-- Source Words Section -->
+                <div class="stage" id="source-words-section">
+                    <div style="margin-bottom: 16px;">
+                        <h3 style="color: var(--charcoal); margin-bottom: 8px;">📚 Source Words</h3>
+                        <p style="font-size: 12px; color: #666; margin-bottom: 12px;">Add words that provide letters for
+                            the puzzle</p>
+                    </div>
+
+                    <div id="source-words-list" style="margin-bottom: 12px;">
+                        <!-- Source words are added here dynamically -->
+                    </div>
+
+                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                        <input type="text" id="new-source-word-input" placeholder="Enter a source word..."
+                            style="flex: 1; min-width: 150px; padding: 8px 12px; font-size: 14px; border: 3px solid var(--persian-green); border-radius: 12px; font-weight: 600;"
+                            onkeypress="handleSourceWordKeypress(event)">
+                        <button class="btn btn-primary btn-small" onclick="addSourceWord()">+ Add Word</button>
+                        <button class="btn btn-secondary btn-small" onclick="addRandomSourceWord()">🎲 Random</button>
+                        <button class="btn btn-secondary btn-small" onclick="clearSourceWords()"
+                            style="color: var(--burnt-sienna); border-color: var(--burnt-sienna);">Clear All</button>
+                    </div>
+
+                    <div style="margin-top: 12px; display: flex; gap: 8px; align-items: center;">
+                        <label style="font-size: 12px; color: #666;">Random word pool:</label>
+                        <select id="word-pool-size"
+                            style="padding: 6px 12px; border: 2px solid var(--persian-green); border-radius: 8px; font-size: 12px; font-weight: 600;">
+                            <option value="100">Top 100 common nouns</option>
+                            <option value="250">Top 250 common nouns</option>
+                            <option value="500" selected>Top 500 common nouns</option>
+                            <option value="1000">Top 1000 common nouns</option>
+                        </select>
+                    </div>
+                </div>
+
+
+
+                <!-- Extra Letters Section (2 specific letters) -->
+                <div class="stage" id="extra-letters-section">
+                    <div style="margin-bottom: 16px;">
+                        <h3 style="color: var(--charcoal); margin-bottom: 8px;">🔤 Extra Letters (2 Required)</h3>
+                        <p style="font-size: 12px; color: #666; margin-bottom: 12px;">
+                            Letter 1 → Target 1 &nbsp;|&nbsp; Letter 2 → Target 2 &nbsp;|&nbsp; Both → Target 3
+                        </p>
+                    </div>
+
+                    <div style="display: flex; gap: 24px; align-items: center; margin-bottom: 12px;">
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <label style="font-weight: 600; color: var(--charcoal); font-size: 14px;">Letter 1:</label>
+                            <input type="text" id="extra-letter-1-input" maxlength="1" placeholder="?"
+                                style="width: 50px; padding: 8px 12px; font-size: 16px; border: 3px solid var(--persian-green); border-radius: 12px; font-weight: 700; text-transform: uppercase; text-align: center;"
+                                oninput="updateExtraLetter1()">
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <label style="font-weight: 600; color: var(--charcoal); font-size: 14px;">Letter 2:</label>
+                            <input type="text" id="extra-letter-2-input" maxlength="1" placeholder="?"
+                                style="width: 50px; padding: 8px 12px; font-size: 16px; border: 3px solid var(--persian-green); border-radius: 12px; font-weight: 700; text-transform: uppercase; text-align: center;"
+                                oninput="updateExtraLetter2()">
+                        </div>
+                    </div>
+
+                    <div id="extra-letters-display" class="letters" style="min-height: 30px;">
+                        <!-- Extra letters tiles appear here -->
+                    </div>
+                </div>
+
+                <!-- Letter Pool Preview -->
+                <div class="stage" id="letter-pool-section" style="background: #e8f4f2;">
+                    <div style="margin-bottom: 12px;">
+                        <h3 style="color: var(--charcoal); margin-bottom: 8px;">📦 Complete Letter Pool</h3>
+                        <p style="font-size: 12px; color: #666;">All available letters from words and extras</p>
+                    </div>
+
+                    <div id="letter-pool-display" class="letters" style="min-height: 40px;">
+                        <span style="font-size: 12px; color: #999;">Add source words or letters above...</span>
+                    </div>
+
+                    <div id="letter-pool-stats" style="margin-top: 12px; font-size: 12px; color: #666;"></div>
+                </div>
+
+                <!-- Target Words Section -->
+                <div class="stage" id="target-words-section">
+                    <div style="margin-bottom: 16px;">
+                        <h3 style="color: var(--charcoal); margin-bottom: 8px;">🎯 Target Words (3 Required)</h3>
+                        <p style="font-size: 12px; color: #666; margin-bottom: 12px;">Each target must use the specified
+                            extra letter(s)</p>
+                        <button class="btn btn-primary" onclick="autoGeneratePuzzle()" style="width: 100%;">✨
+                            Auto-Generate Puzzle</button>
+                        <div id="generate-status" style="margin-top: 8px; font-size: 12px; color: #666;"></div>
+                    </div>
+
+                    <div id="target-words-list">
+                        <!-- 3 target word inputs rendered here -->
+                    </div>
+                </div>
+
+
+                <!-- Puzzle Summary -->
+                <div id="slot-puzzle-summary" class="summary-panel" style="display: none;">
+                    <h3>Puzzle Summary</h3>
+                    <div id="slot-summary-content"></div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="words.js"></script>
+    <script>
+        // Top 1000 most common English nouns (ordered by frequency)
+        const COMMON_NOUNS = [
+            // Top 100 (most common)
+            'time', 'year', 'people', 'way', 'day', 'man', 'thing', 'woman', 'life', 'child',
+            'world', 'school', 'state', 'family', 'student', 'group', 'country', 'problem', 'hand', 'part',
+            'place', 'case', 'week', 'company', 'system', 'program', 'question', 'work', 'government', 'number',
+            'night', 'point', 'home', 'water', 'room', 'mother', 'area', 'money', 'story', 'fact',
+            'month', 'lot', 'right', 'study', 'book', 'eye', 'job', 'word', 'business', 'issue',
+            'side', 'kind', 'head', 'house', 'service', 'friend', 'father', 'power', 'hour', 'game',
+            'line', 'end', 'member', 'law', 'car', 'city', 'community', 'name', 'president', 'team',
+            'minute', 'idea', 'kid', 'body', 'information', 'back', 'parent', 'face', 'others', 'level',
+            'office', 'door', 'health', 'person', 'art', 'war', 'history', 'party', 'result', 'change',
+            'morning', 'reason', 'research', 'girl', 'guy', 'moment', 'air', 'teacher', 'force', 'education',
+            // Top 250
+            'food', 'foot', 'boy', 'age', 'policy', 'process', 'music', 'market', 'sense', 'nation',
+            'plan', 'college', 'interest', 'death', 'experience', 'effect', 'use', 'class', 'control', 'care',
+            'field', 'development', 'role', 'effort', 'rate', 'heart', 'drug', 'show', 'leader', 'light',
+            'voice', 'wife', 'police', 'mind', 'difference', 'period', 'building', 'action', 'need', 'form',
+            'land', 'report', 'bank', 'attention', 'decision', 'event', 'love', 'career', 'value', 'baby',
+            'road', 'table', 'court', 'patient', 'church', 'ground', 'paper', 'space', 'term', 'test',
+            'sound', 'focus', 'news', 'risk', 'cup', 'page', 'blood', 'position', 'type', 'date',
+            'order', 'author', 'window', 'figure', 'view', 'bill', 'movie', 'book', 'price', 'brother',
+            'husband', 'doctor', 'chance', 'film', 'player', 'deal', 'window', 'gun', 'fire', 'wall',
+            'star', 'computer', 'nation', 'south', 'management', 'security', 'activity', 'language', 'color', 'data',
+            'site', 'sport', 'board', 'cover', 'oil', 'picture', 'season', 'summer', 'tax', 'staff',
+            'ball', 'town', 'model', 'growth', 'income', 'step', 'record', 'floor', 'industry', 'feeling',
+            'property', 'message', 'phone', 'image', 'goal', 'song', 'tree', 'nature', 'finger', 'garden',
+            'source', 'rock', 'race', 'culture', 'design', 'press', 'size', 'material', 'performance', 'bed',
+            'box', 'race', 'park', 'director', 'list', 'strategy', 'range', 'theory', 'fish', 'character',
+            // Top 500
+            'region', 'glass', 'bird', 'dog', 'trouble', 'media', 'chair', 'benefit', 'animal', 'cell',
+            'paper', 'loss', 'face', 'leg', 'bridge', 'arm', 'shot', 'wind', 'stage', 'video',
+            'street', 'dream', 'capital', 'plant', 'hotel', 'flower', 'reality', 'truth', 'corner', 'scene',
+            'practice', 'memory', 'bank', 'movement', 'pain', 'artist', 'river', 'section', 'master', 'speech',
+            'island', 'gift', 'faith', 'judge', 'instance', 'edge', 'weekend', 'camera', 'mission', 'mile',
+            'match', 'project', 'spring', 'gold', 'horse', 'station', 'king', 'version', 'lake', 'kitchen',
+            'army', 'stone', 'wood', 'club', 'winter', 'method', 'hall', 'airport', 'ocean', 'lunch',
+            'beer', 'tea', 'wine', 'cream', 'sugar', 'butter', 'chicken', 'meat', 'rice', 'bread',
+            'cake', 'cheese', 'fruit', 'salad', 'milk', 'coffee', 'juice', 'pizza', 'soup', 'salt',
+            'pepper', 'sauce', 'candy', 'snack', 'meal', 'dinner', 'breakfast', 'dessert', 'drink', 'dish',
+            'coast', 'sand', 'beach', 'mountain', 'forest', 'sky', 'cloud', 'rain', 'snow', 'storm',
+            'sun', 'moon', 'planet', 'dust', 'grass', 'leaf', 'root', 'seed', 'branch', 'bark',
+            'path', 'trail', 'field', 'farm', 'crop', 'soil', 'dirt', 'mud', 'hill', 'valley',
+            'cliff', 'cave', 'desert', 'jungle', 'pond', 'stream', 'wave', 'tide', 'shore', 'harbor',
+            'boat', 'ship', 'port', 'dock', 'anchor', 'sail', 'deck', 'crew', 'captain', 'pilot',
+            'plane', 'flight', 'ticket', 'gate', 'seat', 'wheel', 'tire', 'engine', 'tank', 'truck',
+            'bus', 'train', 'track', 'bike', 'helmet', 'horn', 'mirror', 'trunk', 'hood', 'brake',
+            // Top 750
+            'shirt', 'pants', 'dress', 'skirt', 'coat', 'jacket', 'hat', 'cap', 'shoe', 'boot',
+            'sock', 'belt', 'tie', 'scarf', 'glove', 'bag', 'purse', 'wallet', 'ring', 'chain',
+            'watch', 'clock', 'phone', 'screen', 'keyboard', 'mouse', 'speaker', 'cable', 'plug', 'button',
+            'switch', 'lamp', 'desk', 'shelf', 'drawer', 'cabinet', 'closet', 'couch', 'pillow', 'blanket',
+            'sheet', 'towel', 'soap', 'brush', 'comb', 'razor', 'nail', 'tooth', 'hair', 'skin',
+            'bone', 'muscle', 'brain', 'lung', 'liver', 'kidney', 'stomach', 'throat', 'chest', 'shoulder',
+            'elbow', 'wrist', 'thumb', 'palm', 'knee', 'ankle', 'heel', 'toe', 'neck', 'chin',
+            'cheek', 'nose', 'ear', 'mouth', 'lip', 'tongue', 'brow', 'forehead', 'skull', 'spine',
+            'rib', 'hip', 'thigh', 'calf', 'nerve', 'vein', 'organ', 'cell', 'tissue', 'germ',
+            'virus', 'fever', 'cold', 'flu', 'cough', 'pill', 'shot', 'cast', 'wound', 'scar',
+            // Top 1000
+            'nurse', 'clinic', 'surgery', 'exam', 'dose', 'cure', 'patient', 'symptom', 'treatment', 'therapy',
+            'lab', 'test', 'sample', 'data', 'chart', 'graph', 'math', 'science', 'physics', 'chemistry',
+            'biology', 'geology', 'algebra', 'geometry', 'calculus', 'theory', 'formula', 'equation', 'proof', 'logic',
+            'atom', 'molecule', 'element', 'compound', 'mixture', 'solution', 'acid', 'base', 'gas', 'liquid',
+            'solid', 'metal', 'copper', 'iron', 'steel', 'silver', 'bronze', 'brass', 'tin', 'lead',
+            'zinc', 'plastic', 'rubber', 'glass', 'fabric', 'cotton', 'wool', 'silk', 'leather', 'linen',
+            'thread', 'needle', 'button', 'zipper', 'pocket', 'seam', 'hem', 'collar', 'sleeve', 'cuff',
+            'loop', 'knot', 'bow', 'ribbon', 'lace', 'pattern', 'stripe', 'dot', 'circle', 'square',
+            'triangle', 'rectangle', 'diamond', 'oval', 'cube', 'sphere', 'cone', 'cylinder', 'pyramid', 'prism',
+            'angle', 'curve', 'edge', 'corner', 'surface', 'center', 'middle', 'bottom', 'top', 'front',
+            'back', 'left', 'right', 'east', 'west', 'north', 'south', 'pole', 'axis', 'orbit',
+            'gravity', 'force', 'energy', 'heat', 'cold', 'motion', 'speed', 'velocity', 'mass', 'weight',
+            'volume', 'density', 'pressure', 'tension', 'friction', 'impact', 'shock', 'wave', 'sound', 'noise',
+            'echo', 'tone', 'pitch', 'beat', 'rhythm', 'melody', 'harmony', 'chord', 'note', 'scale',
+            'band', 'orchestra', 'choir', 'singer', 'drummer', 'guitar', 'piano', 'violin', 'flute', 'drum',
+            'horn', 'bell', 'string', 'key', 'pedal', 'stage', 'curtain', 'spotlight', 'audience', 'concert',
+            'show', 'act', 'scene', 'script', 'role', 'cast', 'crew', 'prop', 'costume', 'mask',
+            'paint', 'brush', 'canvas', 'frame', 'gallery', 'museum', 'exhibit', 'statue', 'sculpture', 'photo',
+            'portrait', 'sketch', 'drawing', 'print', 'poster', 'sign', 'banner', 'flag', 'badge', 'seal',
+            'stamp', 'coin', 'bill', 'cash', 'check', 'card', 'loan', 'debt', 'credit', 'bank'
+        ];
+
+        // Slot Type Puzzle State
+        let slotPuzzleState = {
+            sourceWords: [],
+            extraLetter1: '',
+            extraLetter2: '',
+            targetWords: ['', '', '']
+        };
+
+        // Utility: Get letter counts from a string
+        function getSlotLetterCounts(str) {
+            const counts = {};
+            for (const char of str.toLowerCase()) {
+                if (char >= 'a' && char <= 'z') {
+                    counts[char] = (counts[char] || 0) + 1;
+                }
+            }
+            return counts;
+        }
+
+        // Utility: Check if a word can be made from available letters
+        function canMakeWordFromPool(word, letterPool) {
+            const wordCounts = getSlotLetterCounts(word);
+            const poolCounts = getSlotLetterCounts(letterPool);
+
+            for (const [letter, count] of Object.entries(wordCounts)) {
+                if (!poolCounts[letter] || poolCounts[letter] < count) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // Utility: Get base letter pool from source words only (no extra letters)
+        function getBaseLetterPool() {
+            let pool = '';
+            for (const word of slotPuzzleState.sourceWords) {
+                pool += word.toLowerCase();
+            }
+            return pool;
+        }
+
+        // Utility: Get full letter pool including both extra letters
+        function getLetterPool() {
+            let pool = getBaseLetterPool();
+            if (slotPuzzleState.extraLetter1) pool += slotPuzzleState.extraLetter1.toLowerCase();
+            if (slotPuzzleState.extraLetter2) pool += slotPuzzleState.extraLetter2.toLowerCase();
+            return pool;
+        }
+
+        // Utility: Check if word is in dictionary
+        function isInDictionary(word) {
+            if (typeof currentWordSet !== 'undefined') {
+                return currentWordSet.has(word.toLowerCase());
+            }
+            return true;
+        }
+
+        // Handle Enter key on source word input
+        function handleSourceWordKeypress(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                addSourceWord();
+            }
+        }
+
+        // Add a new source word
+        function addSourceWord() {
+            const input = document.getElementById('new-source-word-input');
+            const word = input.value.trim().toLowerCase();
+
+            if (!word) return;
+
+            slotPuzzleState.sourceWords.push(word);
+            input.value = '';
+
+            renderSourceWords();
+            renderLetterPool();
+            renderTargetWords();
+            updateSummary();
+        }
+
+        // Remove a source word
+        function removeSourceWord(index) {
+            slotPuzzleState.sourceWords.splice(index, 1);
+            renderSourceWords();
+            renderLetterPool();
+            renderTargetWords();
+            updateSummary();
+        }
+
+        // Clear all source words
+        function clearSourceWords() {
+            slotPuzzleState.sourceWords = [];
+            renderSourceWords();
+            renderLetterPool();
+            renderTargetWords();
+            updateSummary();
+        }
+
+        // Add a random source word from common nouns list
+        function addRandomSourceWord() {
+            // Get pool size from selector
+            const poolSizeEl = document.getElementById('word-pool-size');
+            const poolSize = parseInt(poolSizeEl?.value || '500');
+
+            // Get the appropriate subset of common nouns
+            const nounPool = COMMON_NOUNS.slice(0, poolSize);
+
+            // Filter to words with 4-7 letters (good for puzzles)
+            const eligibleWords = nounPool.filter(w => w.length >= 4 && w.length <= 7);
+
+            if (eligibleWords.length === 0) {
+                alert('No eligible words in pool');
+                return;
+            }
+
+            // Pick a random word that isn't already in source words
+            const availableWords = eligibleWords.filter(w => !slotPuzzleState.sourceWords.includes(w));
+            if (availableWords.length === 0) {
+                alert('All common nouns from this pool are already used!');
+                return;
+            }
+
+            const randomWord = availableWords[Math.floor(Math.random() * availableWords.length)];
+            slotPuzzleState.sourceWords.push(randomWord);
+
+            renderSourceWords();
+            renderLetterPool();
+            renderTargetWords();
+            updateSummary();
+        }
+
+
+        // Auto-generate the puzzle (extra letters + target words)
+        function autoGeneratePuzzle() {
+            const statusEl = document.getElementById('generate-status');
+
+            if (slotPuzzleState.sourceWords.length === 0) {
+                statusEl.innerHTML = '<span style="color: var(--burnt-sienna);">⚠️ Add source words first!</span>';
+                return;
+            }
+
+            statusEl.innerHTML = '<span style="color: var(--persian-green);">🔄 Generating...</span>';
+
+            // Use setTimeout to allow UI to update
+            setTimeout(() => {
+                const basePool = getBaseLetterPool();
+                const basePoolSet = new Set(basePool.split(''));
+
+                // Get all available letters not in the base pool (for extra letters)
+                const alphabet = 'abcdefghijklmnopqrstuvwxyz'.split('');
+
+                // Try different letter combinations
+                let found = false;
+                let attempts = 0;
+                const maxAttempts = 100;
+
+                while (!found && attempts < maxAttempts) {
+                    attempts++;
+
+                    // Pick 2 random letters that could create new words
+                    const shuffledAlphabet = [...alphabet].sort(() => Math.random() - 0.5);
+                    const letter1 = shuffledAlphabet[0];
+                    const letter2 = shuffledAlphabet[1];
+
+                    // Set the extra letters
+                    slotPuzzleState.extraLetter1 = letter1;
+                    slotPuzzleState.extraLetter2 = letter2;
+
+                    const pool1 = basePool + letter1;  // Pool with only letter1
+                    const pool2 = basePool + letter2;  // Pool with only letter2
+                    const poolBoth = basePool + letter1 + letter2;  // Pool with both
+
+                    // Find valid target words
+                    const target1Candidates = [];
+                    const target2Candidates = [];
+                    const target3Candidates = [];
+
+                    // Use common nouns list based on pool size selector
+                    const poolSizeEl = document.getElementById('word-pool-size');
+                    const poolSize = parseInt(poolSizeEl?.value || '500');
+                    const wordList = COMMON_NOUNS.slice(0, poolSize);
+
+                    for (const word of wordList) {
+                        if (word.length < 3 || word.length > 8) continue;
+
+                        // Target 1: needs letter1, can be made with pool1 but NOT basePool+letter2
+                        if (canMakeWordFromPool(word, pool1) && !canMakeWordFromPool(word, pool2)) {
+                            target1Candidates.push(word);
+                        }
+
+                        // Target 2: needs letter2, can be made with pool2 but NOT basePool+letter1
+                        if (canMakeWordFromPool(word, pool2) && !canMakeWordFromPool(word, pool1)) {
+                            target2Candidates.push(word);
+                        }
+
+                        // Target 3: needs BOTH letters
+                        if (canMakeWordFromPool(word, poolBoth) &&
+                            !canMakeWordFromPool(word, pool1) &&
+                            !canMakeWordFromPool(word, pool2)) {
+                            target3Candidates.push(word);
+                        }
+                    }
+
+
+                    // Check if we found valid candidates for all three targets
+                    if (target1Candidates.length > 0 && target2Candidates.length > 0 && target3Candidates.length > 0) {
+                        slotPuzzleState.targetWords[0] = target1Candidates[Math.floor(Math.random() * target1Candidates.length)];
+                        slotPuzzleState.targetWords[1] = target2Candidates[Math.floor(Math.random() * target2Candidates.length)];
+                        slotPuzzleState.targetWords[2] = target3Candidates[Math.floor(Math.random() * target3Candidates.length)];
+                        found = true;
+                    }
+                }
+
+                // Update UI
+                document.getElementById('extra-letter-1-input').value = slotPuzzleState.extraLetter1.toUpperCase();
+                document.getElementById('extra-letter-2-input').value = slotPuzzleState.extraLetter2.toUpperCase();
+
+                renderExtraLetters();
+                renderLetterPool();
+                renderTargetWords();
+                updateSummary();
+
+                if (found) {
+                    statusEl.innerHTML = '<span style="color: var(--persian-green);">✅ Puzzle generated successfully!</span>';
+                } else {
+                    statusEl.innerHTML = '<span style="color: var(--burnt-sienna);">⚠️ Could not find valid combination. Try different source words.</span>';
+                }
+            }, 50);
+        }
+
+
+        // Update extra letter 1
+        function updateExtraLetter1() {
+            const input = document.getElementById('extra-letter-1-input');
+            const letter = input.value.replace(/[^a-zA-Z]/g, '').toLowerCase().charAt(0) || '';
+            slotPuzzleState.extraLetter1 = letter;
+            input.value = letter.toUpperCase();
+
+            renderExtraLetters();
+            renderLetterPool();
+            renderTargetWords();
+            updateSummary();
+        }
+
+        // Update extra letter 2
+        function updateExtraLetter2() {
+            const input = document.getElementById('extra-letter-2-input');
+            const letter = input.value.replace(/[^a-zA-Z]/g, '').toLowerCase().charAt(0) || '';
+            slotPuzzleState.extraLetter2 = letter;
+            input.value = letter.toUpperCase();
+
+            renderExtraLetters();
+            renderLetterPool();
+            renderTargetWords();
+            updateSummary();
+        }
+
+        // Update a target word
+        function updateTargetWord(index, value) {
+            slotPuzzleState.targetWords[index] = value.trim().toLowerCase();
+            updateTargetValidation(index);
+            updateSummary();
+        }
+
+        // Validate target word based on slot puzzle rules
+        function validateTargetWord(word, index) {
+            if (!word) return { valid: null, icon: '', color: '#e0e0e0', message: '' };
+
+            const basePool = getBaseLetterPool();
+            const fullPool = getLetterPool();
+            const letter1 = slotPuzzleState.extraLetter1;
+            const letter2 = slotPuzzleState.extraLetter2;
+            const inDict = isInDictionary(word);
+            const dictWarning = !inDict ? ' (⚠️ not in dictionary)' : '';
+
+            const canMake = canMakeWordFromPool(word, fullPool);
+            if (!canMake) {
+                return { valid: false, icon: '❌', color: 'var(--burnt-sienna)', message: 'Cannot be made from available letters' };
+            }
+
+            if (index === 0) {
+                if (!letter1) return { valid: false, icon: '⚠️', color: '#ffc107', message: 'Set Extra Letter 1 first' };
+                const poolWithoutLetter1 = basePool + (letter2 || '');
+                if (canMakeWordFromPool(word, poolWithoutLetter1)) {
+                    return { valid: false, icon: '❌', color: 'var(--burnt-sienna)', message: `Must require letter "${letter1.toUpperCase()}" (can be made without it)` };
+                }
+                return { valid: true, icon: '✅', color: 'var(--persian-green)', message: `Uses "${letter1.toUpperCase()}" ✓${dictWarning}` };
+            }
+            else if (index === 1) {
+                if (!letter2) return { valid: false, icon: '⚠️', color: '#ffc107', message: 'Set Extra Letter 2 first' };
+                const poolWithoutLetter2 = basePool + (letter1 || '');
+                if (canMakeWordFromPool(word, poolWithoutLetter2)) {
+                    return { valid: false, icon: '❌', color: 'var(--burnt-sienna)', message: `Must require letter "${letter2.toUpperCase()}" (can be made without it)` };
+                }
+                return { valid: true, icon: '✅', color: 'var(--persian-green)', message: `Uses "${letter2.toUpperCase()}" ✓${dictWarning}` };
+            }
+            else if (index === 2) {
+                if (!letter1 || !letter2) return { valid: false, icon: '⚠️', color: '#ffc107', message: 'Set both extra letters first' };
+                const canMakeWithoutLetter1 = canMakeWordFromPool(word, basePool + letter2);
+                const canMakeWithoutLetter2 = canMakeWordFromPool(word, basePool + letter1);
+
+                if (canMakeWithoutLetter1 && canMakeWithoutLetter2) {
+                    return { valid: false, icon: '❌', color: 'var(--burnt-sienna)', message: 'Must require BOTH extra letters' };
+                }
+                if (canMakeWithoutLetter1) {
+                    return { valid: false, icon: '❌', color: 'var(--burnt-sienna)', message: `Must also require "${letter1.toUpperCase()}" (only uses "${letter2.toUpperCase()}")` };
+                }
+                if (canMakeWithoutLetter2) {
+                    return { valid: false, icon: '❌', color: 'var(--burnt-sienna)', message: `Must also require "${letter2.toUpperCase()}" (only uses "${letter1.toUpperCase()}")` };
+                }
+                return { valid: true, icon: '✅', color: 'var(--persian-green)', message: `Uses both "${letter1.toUpperCase()}" and "${letter2.toUpperCase()}" ✓${dictWarning}` };
+            }
+
+            return { valid: true, icon: '✅', color: 'var(--persian-green)', message: 'Valid!' + dictWarning };
+        }
+
+
+        // Render source words list
+        function renderSourceWords() {
+            const container = document.getElementById('source-words-list');
+
+            if (slotPuzzleState.sourceWords.length === 0) {
+                container.innerHTML = '<p style="font-size: 12px; color: #999; font-style: italic;">No source words added yet</p>';
+                return;
+            }
+
+            container.innerHTML = `
+        <div class="selected-source-tags">
+            ${slotPuzzleState.sourceWords.map((word, index) => {
+                const inDict = isInDictionary(word);
+                return `
+                    <div class="source-tag" style="background: ${inDict ? 'var(--persian-green)' : '#ffc107'}; color: ${inDict ? 'white' : '#333'};">
+                        ${!inDict ? '⚠️ ' : ''}${word.toUpperCase()}
+                        <span class="remove" onclick="removeSourceWord(${index})">&times;</span>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+        }
+
+        // Render extra letters tiles
+        function renderExtraLetters() {
+            const container = document.getElementById('extra-letters-display');
+            const letters = [];
+
+            if (slotPuzzleState.extraLetter1) {
+                letters.push(`<span class="letter-tile" style="background: #ffc107; border-color: #e0a800;" title="Extra Letter 1">${slotPuzzleState.extraLetter1.toUpperCase()}</span>`);
+            }
+            if (slotPuzzleState.extraLetter2) {
+                letters.push(`<span class="letter-tile" style="background: #ffc107; border-color: #e0a800;" title="Extra Letter 2">${slotPuzzleState.extraLetter2.toUpperCase()}</span>`);
+            }
+
+            container.innerHTML = letters.join('') || '<span style="font-size: 12px; color: #999;">Enter 2 extra letters above</span>';
+        }
+
+        // Render letter pool preview
+        function renderLetterPool() {
+            const container = document.getElementById('letter-pool-display');
+            const statsContainer = document.getElementById('letter-pool-stats');
+            const pool = getLetterPool();
+
+            if (!pool) {
+                container.innerHTML = '<span style="font-size: 12px; color: #999;">Add source words or letters above...</span>';
+                statsContainer.innerHTML = '';
+                return;
+            }
+
+            const sortedLetters = pool.split('').sort();
+            container.innerHTML = sortedLetters.map(letter => `<span class="letter-tile">${letter.toUpperCase()}</span>`).join('');
+
+            const wordCount = slotPuzzleState.sourceWords.length;
+            const extraCount = (slotPuzzleState.extraLetter1 ? 1 : 0) + (slotPuzzleState.extraLetter2 ? 1 : 0);
+            statsContainer.innerHTML = `<strong>${pool.length}</strong> total letters (${wordCount} word${wordCount !== 1 ? 's' : ''}, ${extraCount}/2 extra letters)`;
+        }
+
+        // Render target words with validation (full rebuild - use only on init or when extra letters change)
+        function renderTargetWords() {
+            const container = document.getElementById('target-words-list');
+            const letter1 = slotPuzzleState.extraLetter1;
+            const letter2 = slotPuzzleState.extraLetter2;
+
+            const targetLabels = [
+                `Target 1 (uses "${letter1 ? letter1.toUpperCase() : '?'}")`,
+                `Target 2 (uses "${letter2 ? letter2.toUpperCase() : '?'}")`,
+                `Target 3 (uses both "${letter1 ? letter1.toUpperCase() : '?'}" + "${letter2 ? letter2.toUpperCase() : '?'}")`
+            ];
+
+            container.innerHTML = slotPuzzleState.targetWords.map((word, index) => {
+                const validation = validateTargetWord(word, index);
+                return `
+            <div style="margin-bottom: 16px;" id="target-container-${index}">
+                <div id="target-label-${index}" style="font-size: 12px; color: var(--charcoal); font-weight: 600; margin-bottom: 4px;">${targetLabels[index]}</div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <span style="font-weight: 700; color: var(--charcoal); min-width: 24px;">${index + 1}.</span>
+                    <input type="text" id="target-input-${index}" value="${word}" placeholder="Enter word..." 
+                        style="flex: 1; padding: 8px 12px; font-size: 14px; border: 3px solid ${validation.color}; border-radius: 12px; font-weight: 600;"
+                        oninput="updateTargetWord(${index}, this.value)">
+                    <span id="target-icon-${index}" style="font-size: 20px; min-width: 28px; text-align: center;">${validation.icon}</span>
+                </div>
+                <div id="target-message-${index}" style="font-size: 11px; color: ${validation.color === 'var(--persian-green)' ? 'var(--persian-green)' : validation.color}; margin-left: 32px; margin-top: 4px; min-height: 16px;">${validation.message || ''}</div>
+            </div>
+        `;
+            }).join('');
+        }
+
+        // Update just the validation display without re-rendering inputs (prevents focus loss)
+        function updateTargetValidation(index) {
+            const validation = validateTargetWord(slotPuzzleState.targetWords[index], index);
+
+            const input = document.getElementById(`target-input-${index}`);
+            const icon = document.getElementById(`target-icon-${index}`);
+            const message = document.getElementById(`target-message-${index}`);
+
+            if (input) {
+                input.style.borderColor = validation.color;
+            }
+            if (icon) {
+                icon.textContent = validation.icon;
+            }
+            if (message) {
+                message.textContent = validation.message || '';
+                message.style.color = validation.color === 'var(--persian-green)' ? 'var(--persian-green)' : validation.color;
+            }
+        }
+
+
+        // Update puzzle summary
+        function updateSummary() {
+            const summaryPanel = document.getElementById('slot-puzzle-summary');
+            const summaryContent = document.getElementById('slot-summary-content');
+
+            const filledTargets = slotPuzzleState.targetWords.filter(w => w.trim());
+            const validTargets = slotPuzzleState.targetWords.map((w, i) => validateTargetWord(w, i)).filter(v => v.valid === true);
+
+            if (slotPuzzleState.sourceWords.length === 0 && !slotPuzzleState.extraLetter1 && !slotPuzzleState.extraLetter2) {
+                summaryPanel.style.display = 'none';
+                return;
+            }
+
+            summaryPanel.style.display = 'block';
+
+            const letter1 = slotPuzzleState.extraLetter1;
+            const letter2 = slotPuzzleState.extraLetter2;
+            const isComplete = filledTargets.length === 3 && validTargets.length === 3 && letter1 && letter2;
+
+            summaryContent.innerHTML = `
+        <div style="display: grid; gap: 16px;">
+            <div>
+                <div style="font-weight: 700; color: var(--charcoal); margin-bottom: 8px;">Source Words:</div>
+                <div class="letters">
+                    ${slotPuzzleState.sourceWords.map(w =>
+                `<span style="background: var(--saffron); color: var(--charcoal); padding: 4px 10px; border-radius: 12px; font-weight: 700; border: 2px solid #c9a854;">${w.toUpperCase()}</span>`
+            ).join('') || '<span style="color: #999;">None</span>'}
+                </div>
+            </div>
+            
+            <div>
+                <div style="font-weight: 700; color: var(--charcoal); margin-bottom: 8px;">Extra Letters:</div>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <span style="font-size: 12px; color: #666;">Letter 1:</span>
+                    <span class="letter-tile" style="background: ${letter1 ? '#ffc107' : '#f5f5f5'}; border-color: ${letter1 ? '#e0a800' : '#ccc'}; ${!letter1 ? 'color: #999;' : ''}">${letter1 ? letter1.toUpperCase() : '?'}</span>
+                    <span style="font-size: 12px; color: #666;">Letter 2:</span>
+                    <span class="letter-tile" style="background: ${letter2 ? '#ffc107' : '#f5f5f5'}; border-color: ${letter2 ? '#e0a800' : '#ccc'}; ${!letter2 ? 'color: #999;' : ''}">${letter2 ? letter2.toUpperCase() : '?'}</span>
+                </div>
+            </div>
+            
+            <div>
+                <div style="font-weight: 700; color: var(--charcoal); margin-bottom: 8px;">Target Words:</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                    ${slotPuzzleState.targetWords.map((w, i) => {
+                if (!w) return `<span style="color: #999; background: #f5f5f5; padding: 4px 10px; border-radius: 12px; border: 2px dashed #ccc;">Target ${i + 1}</span>`;
+                const validation = validateTargetWord(w, i);
+                return `<span style="background: ${validation.valid ? 'var(--persian-green)' : 'var(--burnt-sienna)'}; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 700; border: 2px solid ${validation.valid ? '#228276' : '#c05640'};">${w.toUpperCase()} ${validation.valid ? '✓' : '✗'}</span>`;
+            }).join('')}
+                </div>
+            </div>
+            
+            <div style="padding: 12px; background: ${isComplete ? '#e8f4f2' : '#fff3cd'}; border-radius: 12px; border: 2px solid ${isComplete ? 'var(--persian-green)' : '#ffc107'};">
+                <span style="font-weight: 700; color: ${isComplete ? 'var(--persian-green)' : '#856404'};">
+                    ${isComplete ? '✅ Puzzle is complete and valid!' : `⚠️ ${3 - validTargets.length} target word${3 - validTargets.length !== 1 ? 's' : ''} need${3 - validTargets.length === 1 ? 's' : ''} attention`}
+                </span>
+            </div>
+        </div>
+    `;
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            renderSourceWords();
+            renderExtraLetters();
+            renderLetterPool();
+            renderTargetWords();
+            updateSummary();
+        });
+    </script>
+</body>
+
+</html>
