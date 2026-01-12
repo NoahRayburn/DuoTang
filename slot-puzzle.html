@@ -4,292 +4,665 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Slot Type Puzzle Builder</title>
+    <title>DuoTang - Slot Puzzle Game</title>
     <link rel="stylesheet" href="styles.css">
+    <style>
+        :root {
+            --tile-size: 50px;
+        }
+
+        .game-area {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            margin-top: 20px;
+            user-select: none;
+        }
+
+        .section-box {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e0e0e0;
+        }
+
+        /* Goals Section */
+        .goals-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 12px;
+        }
+
+        .goal-card {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .goal-card.completed {
+            background: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+
+        .goal-icon {
+            font-size: 24px;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        /* Work Area */
+        .work-bench {
+            background: #f1f3f5;
+            min-height: 80px;
+            border-radius: 12px;
+            border: 3px dashed #ced4da;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px;
+            transition: background 0.2s;
+        }
+
+        .work-bench.drag-over {
+            background: #e9ecef;
+            border-color: var(--persian-green);
+        }
+
+        /* Tile Bench */
+        .tile-bench {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            padding: 12px;
+            min-height: 70px;
+        }
+
+        /* Tiles */
+        .game-tile {
+            width: var(--tile-size);
+            height: var(--tile-size);
+            background: white;
+            border: 2px solid var(--charcoal);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--charcoal);
+            cursor: grab;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            user-select: none;
+            touch-action: none;
+            /* For future touch support */
+        }
+
+        .game-tile.source-1 {
+            background: #e3f2fd;
+            border-color: #90caf9;
+            color: #0d47a1;
+        }
+
+        .game-tile.source-2 {
+            background: #e8f5e9;
+            border-color: #a5d6a7;
+            color: #1b5e20;
+        }
+
+        .game-tile.special {
+            border-color: #e0a800;
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .game-tile:active {
+            cursor: grabbing;
+            transform: scale(1.05);
+        }
+
+        .game-tile.used {
+            opacity: 0.5;
+            pointer-events: none;
+            filter: grayscale(1);
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        /* Victory Screen */
+        .victory-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .victory-content {
+            background: white;
+            padding: 32px;
+            border-radius: 16px;
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            from {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+    </style>
 </head>
 
 <body>
     <div class="container">
         <header>
             <h1>DuoTang</h1>
-            <p class="subtitle">Slot Type Puzzle Builder</p>
+            <p class="subtitle">Slot Puzzle Game</p>
             <a href="index.html"
                 style="position: absolute; top: 16px; left: 16px; color: var(--persian-green); text-decoration: none; font-weight: 700; font-size: 14px;">←
-                Original Puzzle</a>
+                Back</a>
         </header>
 
         <main>
-            <section id="slot-puzzle-config">
-                <div style="text-align: center; margin-bottom: 24px;">
-                    <button class="btn btn-primary" onclick="generateFullPuzzle()"
-                        style="font-size: 18px; padding: 12px 24px; width: 100%; max-width: 400px;">
-                        ✨ Generate New Puzzle
-                    </button>
-                    <div id="generate-status"
-                        style="margin-top: 8px; font-size: 14px; font-weight: 600; min-height: 20px;"></div>
+            <!-- Start Screen -->
+            <div id="start-screen" style="text-align: center; padding: 40px 0;">
+                <h2 style="color: var(--charcoal); margin-bottom: 24px;">Ready to play?</h2>
+                <button class="btn btn-primary" onclick="startGame()" style="font-size: 20px; padding: 16px 40px;">
+                    ✨ Start New Game
+                </button>
+                <div id="loading-status" style="margin-top: 16px; font-weight: 600;"></div>
+            </div>
+
+            <!-- Game Interface -->
+            <div id="game-interface" style="display: none;">
+
+                <!-- Goals -->
+                <div class="section-box">
+                    <h3 style="margin-top: 0; margin-bottom: 16px; color: var(--charcoal);">Objectives</h3>
+                    <div class="goals-container">
+                        <div class="goal-card" id="goal-1">
+                            <div class="goal-icon">1️⃣</div>
+                            <div class="goal-info">
+                                <div style="font-weight: 700;">Find word with <span
+                                        class="special-letter-1-disp">?</span></div>
+                                <div class="goal-status">Not found</div>
+                            </div>
+                        </div>
+                        <div class="goal-card" id="goal-2">
+                            <div class="goal-icon">2️⃣</div>
+                            <div class="goal-info">
+                                <div style="font-weight: 700;">Find word with <span
+                                        class="special-letter-2-disp">?</span></div>
+                                <div class="goal-status">Not found</div>
+                            </div>
+                        </div>
+                        <div class="goal-card" id="goal-3">
+                            <div class="goal-icon">3️⃣</div>
+                            <div class="goal-info">
+                                <div style="font-weight: 700;">Find word with <span
+                                        class="special-letter-1-disp">?</span> + <span
+                                        class="special-letter-2-disp">?</span></div>
+                                <div class="goal-status">Not found</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Puzzle Display Section -->
-                <div id="puzzle-display" style="display: none;">
-
-                    <!-- Source Words -->
-                    <div class="stage">
-                        <div style="margin-bottom: 12px;">
-                            <h3 style="color: var(--charcoal); margin: 0;">📚 Source Words</h3>
+                <!-- Game Area -->
+                <div class="game-area">
+                    <!-- Work Bench (Drop Zone) -->
+                    <div class="section-box">
+                        <h4 style="margin: 0 0 12px 0; color: #666;">Build Word Here:</h4>
+                        <div id="work-bench" class="work-bench" ondragover="allowDrop(event)"
+                            ondrop="drop(event, 'work-bench')">
+                            <span class="placeholder-text" style="color: #adb5bd; font-style: italic;">Drag tiles
+                                here...</span>
                         </div>
-                        <div id="source-words-list" class="letters"></div>
+
+                        <div class="controls" style="margin-top: 16px;">
+                            <button class="btn btn-secondary" onclick="clearWorkBench()">Clear</button>
+                            <button class="btn btn-primary" onclick="submitWord()" id="submit-btn">Submit Word</button>
+                        </div>
+                        <div id="submit-feedback"
+                            style="text-align: center; margin-top: 8px; font-weight: 600; min-height: 24px;"></div>
                     </div>
 
-                    <!-- Extra Letters -->
-                    <div class="stage">
-                        <div style="margin-bottom: 12px;">
-                            <h3 style="color: var(--charcoal); margin: 0;">🔤 Extra Letters</h3>
-                        </div>
-                        <div id="extra-letters-display" class="letters"></div>
-                    </div>
-
-                    <!-- Target Words -->
-                    <div class="stage">
-                        <div style="margin-bottom: 12px;">
-                            <h3 style="color: var(--charcoal); margin: 0;">🎯 Target Words</h3>
-                        </div>
-                        <div id="target-words-list"></div>
-                    </div>
-
-                    <!-- Summary -->
-                    <div id="slot-puzzle-summary" class="summary-panel">
-                        <h3>Puzzle Solution Summary</h3>
-                        <div id="slot-summary-content"></div>
+                    <!-- Tile Bench (Source) -->
+                    <div class="section-box">
+                        <h4 style="margin: 0 0 12px 0; color: #666;">Your Letters:</h4>
+                        <div id="tile-bench" class="tile-bench" ondragover="allowDrop(event)"
+                            ondrop="drop(event, 'tile-bench')"></div>
                     </div>
                 </div>
 
-            </section>
+                <div style="text-align: center; margin-top: 32px;">
+                    <button class="btn btn-secondary" onclick="giveUp()"
+                        style="color: var(--burnt-sienna); border-color: var(--burnt-sienna);">Give Up & Show
+                        Answers</button>
+                </div>
+            </div>
+
+            <!-- Victory / Game Over Modal -->
+            <div id="victory-modal" class="victory-modal" style="display: none;">
+                <div class="victory-content">
+                    <h2 id="modal-title" style="font-size: 32px; margin-bottom: 16px;">Detailed Status</h2>
+                    <div id="modal-body" style="margin-bottom: 24px; text-align: left;"></div>
+                    <button class="btn btn-primary" onclick="location.reload()">Play Again</button>
+                </div>
+            </div>
+
         </main>
     </div>
 
-    <!-- No local words.js needed, we use CuratedWords.csv directly -->
     <script>
-        // Common nouns loaded from CSV file
+        // Load Words
         let COMMON_NOUNS = [];
+        let FULL_DICTIONARY_SET = new Set();
+        let isWordsLoaded = false;
+        let isDictLoaded = false;
 
-        // Load common nouns from CSV file
+        // Load Generator Words (Curated)
         fetch('CuratedWords.csv')
-            .then(response => response.text())
-            .then(csvText => {
-                // Parse CSV: split by newlines
-                COMMON_NOUNS = csvText
-                    .split('\n')
-                    .map(line => line.trim().toLowerCase())
-                    .filter(word => word.length > 0);
-
-                console.log(`Loaded ${COMMON_NOUNS.length} common nouns from CSV`);
-                document.getElementById('generate-status').textContent = 'Ready to generate!';
+            .then(res => res.text())
+            .then(text => {
+                COMMON_NOUNS = text.split('\n').map(l => l.trim().toLowerCase()).filter(l => l.length > 0);
+                isWordsLoaded = true;
+                checkReady();
             })
-            .catch(err => {
-                console.error('Failed to load CuratedWords.csv:', err);
-                document.getElementById('generate-status').innerHTML = '<span style="color: var(--burnt-sienna);">Error loading word list. Check console.</span>';
-            });
+            .catch(err => console.error('Error loading curated words:', err));
 
-        // Slot Type Puzzle State
-        let slotPuzzleState = {
+        // Load Validation Dictionary (Full)
+        fetch('FullDictionary.txt')
+            .then(res => res.text())
+            .then(text => {
+                const words = text.split(/\r?\n/);
+                words.forEach(w => {
+                    const clean = w.trim().toLowerCase();
+                    if (clean.length > 0) FULL_DICTIONARY_SET.add(clean);
+                });
+                isDictLoaded = true;
+                checkReady();
+            })
+            .catch(err => console.error('Error loading full dictionary:', err));
+
+        function checkReady() {
+            if (isWordsLoaded && isDictLoaded) {
+                document.getElementById('loading-status').innerHTML = '<span style="color: var(--persian-green)">Ready!</span>';
+            }
+        }
+
+        // Game State
+        let gameState = {
             sourceWords: [],
             extraLetter1: '',
             extraLetter2: '',
-            targetWords: ['', '', '']
+            generatedTargets: [], // The secret answers
+            goalsMet: [false, false, false],
+            tiles: [], // {id, char, isSpecial, type:'L1'|'L2'|'base'}
+            tileCounter: 0
         };
 
-        // Utility: Get letter counts from a string
-        function getSlotLetterCounts(str) {
+        // --- Logic: Generator (Simplified from previous version) ---
+
+        function getLetterCounts(str) {
             const counts = {};
-            for (const char of str.toLowerCase()) {
-                if (char >= 'a' && char <= 'z') {
-                    counts[char] = (counts[char] || 0) + 1;
-                }
-            }
+            for (const char of str.toLowerCase()) if (char >= 'a' && char <= 'z') counts[char] = (counts[char] || 0) + 1;
             return counts;
         }
 
-        // Utility: Check if a word can be made from available letters
-        function canMakeWordFromPool(word, letterPool) {
-            const wordCounts = getSlotLetterCounts(word);
-            const poolCounts = getSlotLetterCounts(letterPool);
-
-            for (const [letter, count] of Object.entries(wordCounts)) {
-                if (!poolCounts[letter] || poolCounts[letter] < count) {
-                    return false;
-                }
-            }
+        function canMakeWord(word, pool) {
+            const wC = getLetterCounts(word);
+            const pC = getLetterCounts(pool);
+            for (const [l, c] of Object.entries(wC)) if (!pC[l] || pC[l] < c) return false;
             return true;
         }
 
-        // Utility: Get base letter pool from source words only
-        function getBaseLetterPool() {
-            return slotPuzzleState.sourceWords.join('').toLowerCase();
+        async function generateGameData() {
+            if (!isWordsLoaded) return false;
+
+            let attempts = 0;
+            while (attempts < 50) {
+                attempts++;
+                // 1. Pick 2 Source Words (4-7 chars)
+                const candidates = COMMON_NOUNS.filter(w => w.length >= 4 && w.length <= 7);
+                const sourceWords = [];
+                while (sourceWords.length < 2) {
+                    const w = candidates[Math.floor(Math.random() * candidates.length)];
+                    if (!sourceWords.includes(w)) sourceWords.push(w);
+                }
+
+                const basePool = sourceWords.join('');
+
+                // 2. Pick Extra Letters
+                const alphabet = 'abcdefghijklmnopqrstuvwxyz'.split('');
+                // Filter out letters already abundant in base pool? No, random is fine.
+                const l1 = alphabet[Math.floor(Math.random() * 26)];
+                let l2 = alphabet[Math.floor(Math.random() * 26)];
+                while (l2 === l1) l2 = alphabet[Math.floor(Math.random() * 26)];
+
+                const pool1 = basePool + l1;
+                const pool2 = basePool + l2;
+                const poolBoth = basePool + l1 + l2;
+
+                // 3. Find Valid Targets
+                // Optimize: check random subset
+                const subset = [];
+                for (let k = 0; k < 2000; k++) subset.push(COMMON_NOUNS[Math.floor(Math.random() * COMMON_NOUNS.length)]);
+
+                const validT1 = subset.filter(w => w.length >= 3 && canMakeWord(w, pool1) && !canMakeWord(w, basePool)); // Must use L1 (roughly)
+                const validT2 = subset.filter(w => w.length >= 3 && canMakeWord(w, pool2) && !canMakeWord(w, basePool)); // Must use L2
+                const validT3 = subset.filter(w => w.length >= 3 && canMakeWord(w, poolBoth) && !canMakeWord(w, pool1) && !canMakeWord(w, pool2)); // Must use Both (rough check)
+
+                if (validT1.length > 0 && validT2.length > 0 && validT3.length > 0) {
+                    gameState.sourceWords = sourceWords;
+                    gameState.extraLetter1 = l1;
+                    gameState.extraLetter2 = l2;
+                    gameState.generatedTargets = [
+                        validT1[Math.floor(Math.random() * validT1.length)],
+                        validT2[Math.floor(Math.random() * validT2.length)],
+                        validT3[Math.floor(Math.random() * validT3.length)]
+                    ];
+                    return true;
+                }
+            }
+            return false;
         }
 
-        // Generate Full Puzzle Logic
-        async function generateFullPuzzle() {
-            const statusEl = document.getElementById('generate-status');
-            const displayEl = document.getElementById('puzzle-display');
+        // --- UI Functions ---
 
-            if (COMMON_NOUNS.length === 0) {
-                statusEl.textContent = 'Waiting for word list to load...';
+        async function startGame() {
+            if (!isWordsLoaded || !isDictLoaded) return;
+
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('loading-status').innerHTML = 'Generating...';
+
+            const success = await generateGameData();
+            if (!success) {
+                alert("Failed to generate a valid puzzle. Trying again...");
+                location.reload();
                 return;
             }
 
-            statusEl.innerHTML = '<span style="color: var(--persian-green);">🔄 Generating Puzzle...</span>';
-            displayEl.style.display = 'none';
+            initGameUI();
+        }
 
-            // Allow UI to update
-            await new Promise(r => setTimeout(r, 10));
+        function initGameUI() {
+            document.getElementById('game-interface').style.display = 'block';
 
-            let success = false;
-            let attempts = 0;
-            const maxAttempts = 20;
+            // Set Goal Texts
+            const l1 = gameState.extraLetter1.toUpperCase();
+            const l2 = gameState.extraLetter2.toUpperCase();
+            document.querySelectorAll('.special-letter-1-disp').forEach(el => el.textContent = l1);
+            document.querySelectorAll('.special-letter-2-disp').forEach(el => el.textContent = l2);
 
-            while (!success && attempts < maxAttempts) {
-                attempts++;
+            // Create Tiles
+            gameState.tiles = [];
+            gameState.tileCounter = 0;
 
-                // 1. Pick Random Source Words (6-8 words)
-                // Filter for words length 4-7 for good letter distribution
-                const candidateWords = COMMON_NOUNS.filter(w => w.length >= 4 && w.length <= 7);
-                const sourceWords = [];
-                const numSourceWords = 2; // Fixed at 2 words as requested
+            // Source Word tiles
+            gameState.sourceWords.forEach((word, index) => {
+                word.split('').forEach(char => {
+                    gameState.tiles.push({
+                        id: 'tile-' + (gameState.tileCounter++),
+                        char: char.toUpperCase(),
+                        isSpecial: false,
+                        type: 'base',
+                        sourceGroup: index + 1
+                    });
+                });
+            });
 
-                for (let i = 0; i < numSourceWords; i++) {
-                    const randomWord = candidateWords[Math.floor(Math.random() * candidateWords.length)];
-                    if (!sourceWords.includes(randomWord)) {
-                        sourceWords.push(randomWord);
+            // Special tiles
+            gameState.tiles.push({
+                id: 'tile-' + (gameState.tileCounter++),
+                char: gameState.extraLetter1.toUpperCase(),
+                isSpecial: true,
+                type: 'L1'
+            });
+            gameState.tiles.push({
+                id: 'tile-' + (gameState.tileCounter++),
+                char: gameState.extraLetter2.toUpperCase(),
+                isSpecial: true,
+                type: 'L2'
+            });
+
+            renderTiles();
+        }
+
+        function renderTiles() {
+            const bench = document.getElementById('tile-bench');
+            bench.innerHTML = '';
+
+            gameState.tiles.forEach(tile => {
+                const el = createTileElement(tile);
+                bench.appendChild(el);
+            });
+        }
+
+        function createTileElement(tile) {
+            const div = document.createElement('div');
+            div.className = `game-tile ${tile.isSpecial ? 'special' : ''} ${tile.sourceGroup ? 'source-' + tile.sourceGroup : ''}`;
+            div.id = tile.id;
+            div.textContent = tile.char;
+            div.draggable = true;
+            div.dataset.type = tile.type;
+
+            // Click to move (fallback for non-drag)
+            div.onclick = function () {
+                const parent = div.parentElement;
+                const workBench = document.getElementById('work-bench');
+                const tileBench = document.getElementById('tile-bench');
+
+                if (parent === tileBench) {
+                    // check if placeholder is there
+                    const placeholder = workBench.querySelector('.placeholder-text');
+                    if (placeholder) placeholder.remove();
+                    workBench.appendChild(div);
+                } else {
+                    tileBench.appendChild(div);
+                    if (workBench.children.length === 0) {
+                        workBench.innerHTML = '<span class="placeholder-text" style="color: #adb5bd; font-style: italic;">Drag tiles here...</span>';
                     }
                 }
+            };
 
-                slotPuzzleState.sourceWords = sourceWords;
-                const basePool = getBaseLetterPool();
+            div.ondragstart = drag;
+            return div;
+        }
 
-                // 2. Try to find Extra Letters and Target Words
-                const alphabet = 'abcdefghijklmnopqrstuvwxyz'.split('');
-                const shuffledAlphabet = [...alphabet].sort(() => Math.random() - 0.5);
+        // --- Drag and Drop ---
+        function allowDrop(ev) {
+            ev.preventDefault();
+            ev.currentTarget.classList.add('drag-over');
+        }
 
-                // Try a few letter pairs per source set
-                for (let i = 0; i < 50; i++) {
-                    // Pick 2 random letters
-                    const l1I = Math.floor(Math.random() * 26);
-                    let l2I = Math.floor(Math.random() * 26);
-                    while (l2I === l1I) l2I = Math.floor(Math.random() * 26);
+        function drag(ev) {
+            ev.dataTransfer.setData("text", ev.target.id);
+        }
 
-                    const letter1 = alphabet[l1I];
-                    const letter2 = alphabet[l2I];
+        function drop(ev, targetId) {
+            ev.preventDefault();
+            document.querySelectorAll('.work-bench, .tile-bench').forEach(el => el.classList.remove('drag-over'));
 
-                    const pool1 = basePool + letter1;
-                    const pool2 = basePool + letter2;
-                    const poolBoth = basePool + letter1 + letter2;
+            const data = ev.dataTransfer.getData("text");
+            const draggedEl = document.getElementById(data);
+            const targetEl = document.getElementById(targetId);
 
-                    // Find Target Words from the same curated list
-                    // Target 1: needs letter1, NOT letter2 (implied by checking pool1 availability vs pool2/base logic)
-                    // Simplified logic: 
-                    // T1: makeable with pool1, NOT makeable with basePool (must use L1)
-                    // T2: makeable with pool2, NOT makeable with basePool (must use L2)
-                    // T3: makeable with poolBoth, NOT makeable with pool1 OR pool2 (must use BOTH)
-
-                    const validT1 = [];
-                    const validT2 = [];
-                    const validT3 = [];
-
-                    // Optimization: Check a subset of words or random sample to speed up
-                    const sampleSize = 1000;
-                    const wordSample = [];
-                    for (let k = 0; k < sampleSize; k++) {
-                        wordSample.push(COMMON_NOUNS[Math.floor(Math.random() * COMMON_NOUNS.length)]);
-                    }
-
-                    for (const word of wordSample) {
-                        if (word.length < 3 || word.length > 8) continue;
-
-                        const usesL1 = canMakeWordFromPool(word, pool1);
-                        const usesL2 = canMakeWordFromPool(word, pool2);
-                        const usesBoth = canMakeWordFromPool(word, poolBoth);
-
-                        // Check strictly that it *requires* the letter is tricky without subtraction logic
-                        // but "makeable with pool1 AND NOT makeable with basePool" ensures L1 is used.
-                        const makeableBase = canMakeWordFromPool(word, basePool);
-
-                        if (usesL1 && !makeableBase) validT1.push(word);
-                        if (usesL2 && !makeableBase) validT2.push(word);
-                        // For T3, it must be makeable with Both, but NOT with just one of them + base
-                        // actually wait, pool1 is base+L1. 
-                        // So T3 must NOT be makeable with pool1 AND NOT makeable with pool2.
-                        if (usesBoth && !usesL1 && !usesL2) validT3.push(word);
-                    }
-
-                    if (validT1.length > 0 && validT2.length > 0 && validT3.length > 0) {
-                        // Found a valid set!
-                        slotPuzzleState.extraLetter1 = letter1;
-                        slotPuzzleState.extraLetter2 = letter2;
-                        slotPuzzleState.targetWords = [
-                            validT1[Math.floor(Math.random() * validT1.length)],
-                            validT2[Math.floor(Math.random() * validT2.length)],
-                            validT3[Math.floor(Math.random() * validT3.length)]
-                        ];
-                        success = true;
-                        break;
-                    }
-                }
-
-                if (success) break;
+            if (targetId === 'work-bench') {
+                const placeholder = targetEl.querySelector('.placeholder-text');
+                if (placeholder) placeholder.remove();
             }
 
-            if (success) {
-                renderPuzzle();
-                statusEl.innerHTML = '<span style="color: var(--persian-green);">✅ Puzzle Generated!</span>';
-                displayEl.style.display = 'block';
-            } else {
-                statusEl.innerHTML = '<span style="color: var(--burnt-sienna);">⚠️ Failed to generate. Please try again.</span>';
+            targetEl.appendChild(draggedEl);
+
+            // Clean up empty work bench
+            const wb = document.getElementById('work-bench');
+            if (wb.children.length === 0 && !wb.querySelector('.placeholder-text')) {
+                wb.innerHTML = '<span class="placeholder-text" style="color: #adb5bd; font-style: italic;">Drag tiles here...</span>';
             }
         }
 
-        // Render the UI
-        function renderPuzzle() {
-            // Render Source Words
-            const sourceContainer = document.getElementById('source-words-list');
-            sourceContainer.innerHTML = slotPuzzleState.sourceWords.map(w =>
-                `<span style="background: var(--saffron); color: var(--charcoal); padding: 4px 10px; border-radius: 12px; font-weight: 700; border: 2px solid #c9a854;">${w.toUpperCase()}</span>`
-            ).join('');
+        // Remove drag-over style on leave
+        document.addEventListener('dragleave', (e) => {
+            if (e.target.classList.contains('work-bench') || e.target.classList.contains('tile-bench')) {
+                e.target.classList.remove('drag-over');
+            }
+        });
 
-            // Render Extra Letters
-            const extraContainer = document.getElementById('extra-letters-display');
-            extraContainer.innerHTML = `
-                <span class="letter-tile" style="background: #ffc107; border-color: #e0a800;">${slotPuzzleState.extraLetter1.toUpperCase()}</span>
-                <span class="letter-tile" style="background: #ffc107; border-color: #e0a800;">${slotPuzzleState.extraLetter2.toUpperCase()}</span>
+
+        // --- Helper Logic ---
+        function clearWorkBench() {
+            const bench = document.getElementById('work-bench');
+            const tileBench = document.getElementById('tile-bench');
+            const tiles = Array.from(bench.querySelectorAll('.game-tile'));
+            tiles.forEach(t => tileBench.appendChild(t));
+            bench.innerHTML = '<span class="placeholder-text" style="color: #adb5bd; font-style: italic;">Drag tiles here...</span>';
+            document.getElementById('submit-feedback').textContent = '';
+        }
+
+        function submitWord() {
+            const bench = document.getElementById('work-bench');
+            const tiles = Array.from(bench.querySelectorAll('.game-tile'));
+            const feedback = document.getElementById('submit-feedback');
+
+            if (tiles.length === 0) {
+                feedback.textContent = "Drag letters to build a word first!";
+                feedback.style.color = "var(--charcoal)";
+                return;
+            }
+
+            const word = tiles.map(t => t.textContent).join('').toLowerCase();
+
+            // 1. Check Dictionary - Uses the Full Dictionary list
+            if (!FULL_DICTIONARY_SET.has(word)) {
+                feedback.innerHTML = `❌ <strong>${word.toUpperCase()}</strong> is not in the dictionary.`;
+                feedback.style.color = "var(--burnt-sienna)";
+                return;
+            }
+
+            // 2. Check Composition via DOM logic (simplest since tiles moved)
+            let hasL1 = false;
+            let hasL2 = false;
+
+            tiles.forEach(t => {
+                if (t.dataset.type === 'L1') hasL1 = true;
+                if (t.dataset.type === 'L2') hasL2 = true;
+            });
+
+            let metGoal = false;
+
+            // Goal 1: Uses L1 (if not done)
+            if (!gameState.goalsMet[0] && hasL1 && !hasL2) {
+                gameState.goalsMet[0] = true;
+                markGoalComplete(1, word);
+                metGoal = true;
+            }
+            // Goal 2: Uses L2 (if not done)
+            else if (!gameState.goalsMet[1] && hasL2 && !hasL1) {
+                gameState.goalsMet[1] = true;
+                markGoalComplete(2, word);
+                metGoal = true;
+            }
+            // Goal 3: Uses Both (if not done)
+            else if (!gameState.goalsMet[2] && hasL1 && hasL2) {
+                gameState.goalsMet[2] = true;
+                markGoalComplete(3, word);
+                metGoal = true;
+            } else {
+                feedback.innerHTML = `⚠️ <strong>${word.toUpperCase()}</strong> is a valid word, but it doesn't meet a pending objective!`;
+                feedback.style.color = "#ffc107";
+                return;
+            }
+
+            feedback.innerHTML = `✅ Accepted: <strong>${word.toUpperCase()}</strong>`;
+            feedback.style.color = "var(--persian-green)";
+
+            // Reset tiles if game not over
+            if (!checkWin()) {
+                setTimeout(clearWorkBench, 1000);
+            }
+        }
+
+        function markGoalComplete(id, word) {
+            const card = document.getElementById('goal-' + id);
+            card.classList.add('completed');
+            card.querySelector('.goal-status').innerHTML = `Found: <strong>${word.toUpperCase()}</strong>`;
+            card.querySelector('.goal-icon').textContent = '✅';
+        }
+
+        function checkWin() {
+            if (gameState.goalsMet.every(Boolean)) {
+                showVictory();
+                return true;
+            }
+            return false;
+        }
+
+        function showVictory() {
+            const modal = document.getElementById('victory-modal');
+            const title = document.getElementById('modal-title');
+            const body = document.getElementById('modal-body');
+
+            title.textContent = "🎉 Puzzle Solved! 🎉";
+            body.innerHTML = `
+                <p>Great job! You found words for all 3 objectives.</p>
+                <hr style="border: 1px solid #eee; margin: 16px 0;">
+                <p><strong>The secret generated solution was:</strong></p>
+                <ul style="list-style: none; padding: 0;">
+                    <li>1. ${gameState.generatedTargets[0].toUpperCase()}</li>
+                    <li>2. ${gameState.generatedTargets[1].toUpperCase()}</li>
+                    <li>3. ${gameState.generatedTargets[2].toUpperCase()}</li>
+                </ul>
             `;
+            modal.style.display = 'flex';
+        }
 
-            // Render Target Words (Read Only)
-            const targetContainer = document.getElementById('target-words-list');
-            const targets = slotPuzzleState.targetWords;
-            const l1 = slotPuzzleState.extraLetter1.toUpperCase();
-            const l2 = slotPuzzleState.extraLetter2.toUpperCase();
+        function giveUp() {
+            const modal = document.getElementById('victory-modal');
+            const title = document.getElementById('modal-title');
+            const body = document.getElementById('modal-body');
 
-            targetContainer.innerHTML = `
-                <div style="margin-bottom: 8px;">
-                    <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Target 1 (Uses ${l1}):</div>
-                    <div style="font-size: 18px; font-weight: 700; color: var(--persian-green);">${targets[0].toUpperCase()}</div>
-                </div>
-                <div style="margin-bottom: 8px;">
-                    <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Target 2 (Uses ${l2}):</div>
-                    <div style="font-size: 18px; font-weight: 700; color: var(--persian-green);">${targets[1].toUpperCase()}</div>
-                </div>
-                <div style="margin-bottom: 8px;">
-                    <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Target 3 (Uses ${l1} + ${l2}):</div>
-                    <div style="font-size: 18px; font-weight: 700; color: var(--persian-green);">${targets[2].toUpperCase()}</div>
-                </div>
+            title.textContent = "Game Over";
+            body.innerHTML = `
+                <p>Better luck next time!</p>
+                <p><strong>Source Words:</strong> ${gameState.sourceWords.join(', ').toUpperCase()}</p>
+                <hr style="border: 1px solid #eee; margin: 16px 0;">
+                <p><strong>One possible solution was:</strong></p>
+                <ul style="list-style: none; padding: 0;">
+                    <li>1. ${gameState.generatedTargets[0].toUpperCase()}</li>
+                    <li>2. ${gameState.generatedTargets[1].toUpperCase()}</li>
+                    <li>3. ${gameState.generatedTargets[2].toUpperCase()}</li>
+                </ul>
             `;
-
-            // Render Summary
-            const summaryContent = document.getElementById('slot-summary-content');
-            summaryContent.innerHTML = `
-                <p><strong>Source Words:</strong> ${slotPuzzleState.sourceWords.join(', ')}</p>
-                <p><strong>Extra Letters:</strong> ${l1}, ${l2}</p>
-                <p><strong>Solutions:</strong> ${targets.join(', ')}</p>
-            `;
+            modal.style.display = 'flex';
         }
 
     </script>
