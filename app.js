@@ -102,7 +102,7 @@ function getMissingLetterInfo(targetCounts, availableCounts) {
             missingTotal += diff;
         }
     }
-    return {missingCounts, missingTotal};
+    return { missingCounts, missingTotal };
 }
 
 function canMakeWord(word, availableLetters) {
@@ -196,7 +196,7 @@ async function findWordCombinations(targetWord, availableLetters = '', minWords 
 
     // If we have available letters from previous stage, check if they alone can make the target
     if (availableLetters && canMakeWord(targetWord, availableLetters)) {
-        combinations.push({words: [], complete: true, missingCount: 0});  // Empty array means "use available letters only"
+        combinations.push({ words: [], complete: true, missingCount: 0 });  // Empty array means "use available letters only"
         if (progressCallback) progressCallback([...combinations]);
     }
 
@@ -386,15 +386,15 @@ async function findWordCombinations(targetWord, availableLetters = '', minWords 
         for (const word of shuffled) {
             const combined = availableLetters + word;
             const combinedCounts = getLetterCountsArray(combined);
-            const {missingTotal} = getMissingLetterInfo(targetCountsArrayFull, combinedCounts);
+            const { missingTotal } = getMissingLetterInfo(targetCountsArrayFull, combinedCounts);
             const isComplete = missingTotal === 0;
 
             if (isComplete) {
-                combinations.push({words: [word], complete: true, missingCount: 0});
+                combinations.push({ words: [word], complete: true, missingCount: 0 });
                 if (progressCallback) progressCallback([...combinations]);
             } else if (allowMissing) {
                 if (!includeIncomplete && missingTotal > maxMissingLetters) continue;
-                combinations.push({words: [word], complete: false, missingCount: missingTotal});
+                combinations.push({ words: [word], complete: false, missingCount: missingTotal });
                 if (includeIncomplete && progressCallback && combinations.length % 50 === 0) {
                     progressCallback([...combinations]);
                 }
@@ -475,10 +475,10 @@ async function findWordCombinations(targetWord, availableLetters = '', minWords 
                 const combinedCounts = new Uint8Array(word1PlusAvailableCounts);
                 addCountsArray(combinedCounts, data2.counts);
 
-                const {missingTotal} = getMissingLetterInfo(targetCountsArray, combinedCounts);
+                const { missingTotal } = getMissingLetterInfo(targetCountsArray, combinedCounts);
                 const isComplete = missingTotal === 0;
                 if (isComplete) {
-                    combinations.push({words: [data1.word, data2.word], complete: true, missingCount: 0});
+                    combinations.push({ words: [data1.word, data2.word], complete: true, missingCount: 0 });
 
                     // Send progress update every 50 new combinations
                     if (progressCallback && combinations.length - lastUpdate >= 50) {
@@ -487,7 +487,7 @@ async function findWordCombinations(targetWord, availableLetters = '', minWords 
                     }
                 } else if (allowMissing) {
                     if (!includeIncomplete && missingTotal > maxMissingLetters) continue;
-                    combinations.push({words: [data1.word, data2.word], complete: false, missingCount: missingTotal});
+                    combinations.push({ words: [data1.word, data2.word], complete: false, missingCount: missingTotal });
 
                     if (includeIncomplete && progressCallback && combinations.length - lastUpdate >= 50) {
                         progressCallback([...combinations]);
@@ -522,14 +522,14 @@ async function findWordCombinations(targetWord, availableLetters = '', minWords 
 
                     if (combined.length >= targetLen) {
                         const combinedCounts = getLetterCountsArray(combined);
-                        const {missingTotal} = getMissingLetterInfo(targetCountsArrayFull, combinedCounts);
+                        const { missingTotal } = getMissingLetterInfo(targetCountsArrayFull, combinedCounts);
                         const isComplete = missingTotal === 0;
 
                         if (isComplete) {
-                            combinations.push({words: [word1, word2, word3], complete: true, missingCount: 0});
+                            combinations.push({ words: [word1, word2, word3], complete: true, missingCount: 0 });
                         } else if (allowMissing) {
                             if (!includeIncomplete && missingTotal > maxMissingLetters) continue;
-                            combinations.push({words: [word1, word2, word3], complete: false, missingCount: missingTotal});
+                            combinations.push({ words: [word1, word2, word3], complete: false, missingCount: missingTotal });
                         }
                     }
                 }
@@ -578,9 +578,9 @@ function removeStage(index) {
     for (let i = 1; i < stages.length; i++) {
         const prevStage = stages[i - 1];
         if (prevStage.complete) {
-            stages[i].letterPool = prevStage.remainingLetters;
+            stages[i].letterPool = sortString(prevStage.remainingLetters + (stages[i].randomLetters || ''));
         } else {
-            stages[i].letterPool = '';
+            stages[i].letterPool = sortString(stages[i].randomLetters || '');
             stages[i].complete = false;
         }
     }
@@ -607,7 +607,7 @@ function updateTargetWord(index, value) {
     // Clear subsequent stages' completion and letter pools
     for (let i = index + 1; i < stages.length; i++) {
         stages[i].complete = false;
-        stages[i].letterPool = '';
+        stages[i].letterPool = sortString(stages[i].randomLetters || '');
         stages[i].remainingLetters = '';
     }
 
@@ -671,6 +671,9 @@ function renderPuzzleBuilder() {
     addButton.innerHTML = '<button id="btn-add-stage" class="btn btn-primary" onclick="addStage()">+ Add Stage</button>';
     container.appendChild(addButton);
 
+    // Setup container-level drag and drop
+    setupContainerDragDrop(container);
+
     updateSummary();
     updateWordBrowser();
 }
@@ -717,7 +720,6 @@ function createStageElement(stage, index) {
     const div = document.createElement('div');
     div.className = 'stage';
     div.id = `stage-${index}`;
-    div.draggable = true;
     div.dataset.stageIndex = index;
 
     const statusClass = stage.complete ? 'complete' : 'incomplete';
@@ -726,8 +728,8 @@ function createStageElement(stage, index) {
     const availableLettersSection = stage.targetWord && !stage.isFirst ? buildLetterPoolSection(stage, index, 'Available') : '';
 
     div.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; cursor: grab;" title="Drag to reorder">
-            <span style="color: #999; font-size: 18px; line-height: 1;">⋮⋮</span>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+            <span class="drag-handle" draggable="true" data-stage-index="${index}" title="Drag to reorder">⋮⋮</span>
             <input
                 type="text"
                 class="target-word-input"
@@ -755,35 +757,35 @@ function createStageElement(stage, index) {
         ${startingLettersSection}
         ${availableLettersSection}
 
-        ${stage.targetWord && (stage.isFirst || stages[index - 1].complete) ? `
+        ${stage.targetWord ? `
             <div style="margin-bottom: 12px;">
                 <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Missing letters: <span style="font-size: 11px; color: #999;">(click to add as word)</span></div>
                 <div class="letters" id="missing-letters-${index}">
                     ${(() => {
-                        const availableLetters = stage.letterPool || '';
-                        const existingWords = stage.sourceWords.join('');
-                        const allExistingLetters = availableLetters + existingWords;
+                const availableLetters = stage.letterPool || '';
+                const existingWords = stage.sourceWords.join('');
+                const allExistingLetters = availableLetters + existingWords;
 
-                        const targetCounts = getLetterCounts(stage.targetWord);
-                        const availableCounts = getLetterCounts(allExistingLetters);
+                const targetCounts = getLetterCounts(stage.targetWord);
+                const availableCounts = getLetterCounts(allExistingLetters);
 
-                        let missingHTML = '';
-                        for (const [letter, count] of Object.entries(targetCounts)) {
-                            const available = availableCounts[letter] || 0;
-                            const missing = count - available;
-                            if (missing > 0) {
-                                for (let i = 0; i < missing; i++) {
-                                    missingHTML += `<span class="letter-tile" style="background: var(--sandy-brown); border-color: #d88a4d; box-shadow: 0 4px 0 #c07640; cursor: pointer;" onclick="addMissingLettersAsWord(${index}, '${letter}')" title="Click to add '${letter}' as a word">${letter.toUpperCase()}</span>`;
-                                }
-                            }
+                let missingHTML = '';
+                for (const [letter, count] of Object.entries(targetCounts)) {
+                    const available = availableCounts[letter] || 0;
+                    const missing = count - available;
+                    if (missing > 0) {
+                        for (let i = 0; i < missing; i++) {
+                            missingHTML += `<span class="letter-tile" style="background: var(--sandy-brown); border-color: #d88a4d; box-shadow: 0 4px 0 #c07640; cursor: pointer;" onclick="addMissingLettersAsWord(${index}, '${letter}')" title="Click to add '${letter}' as a word">${letter.toUpperCase()}</span>`;
                         }
-                        return missingHTML || '<span style="font-size: 12px; color: var(--persian-green); font-weight: 600;">None - ready to validate!</span>';
-                    })()}
+                    }
+                }
+                return missingHTML || '<span style="font-size: 12px; color: var(--persian-green); font-weight: 600;">None - ready to validate!</span>';
+            })()}
                 </div>
             </div>
         ` : ''}
 
-        ${stage.targetWord && (stage.isFirst || stages[index - 1].complete) ? `
+        ${stage.targetWord ? `
             <div>
                 ${stage.sourceWords.length > 0 ? `
                     <div class="selected-source-tags" id="selected-tags-${index}" style="margin-bottom: 8px;">
@@ -855,103 +857,204 @@ function createStageElement(stage, index) {
 
                 <div id="message-${index}" style="margin-top: 8px;"></div>
             </div>
-        ` : `
-            <div style="color: #999; font-size: 12px; font-style: italic;">Complete previous stage first</div>
-        `}
+        ` : ''}
     `;
-
-    // Add drag event listeners
-    div.addEventListener('dragstart', handleDragStart);
-    div.addEventListener('dragover', handleDragOver);
-    div.addEventListener('drop', handleDrop);
-    div.addEventListener('dragenter', handleDragEnter);
-    div.addEventListener('dragleave', handleDragLeave);
-    div.addEventListener('dragend', handleDragEnd);
 
     return div;
 }
 
-// Drag and Drop functionality
-let draggedElement = null;
+// Drag and Drop functionality — insertion-based with drop indicator
 let draggedIndex = null;
+let dropIndicator = null;
+let dropTargetIndex = null;
 
-function handleDragStart(e) {
-    draggedElement = e.currentTarget;
-    draggedIndex = parseInt(draggedElement.dataset.stageIndex);
-    e.currentTarget.style.opacity = '0.5';
-    e.dataTransfer.effectAllowed = 'move';
-}
-
-function handleDragOver(e) {
-    if (e.preventDefault) {
-        e.preventDefault();
+function getDropIndicator() {
+    if (!dropIndicator) {
+        dropIndicator = document.createElement('div');
+        dropIndicator.className = 'drop-indicator';
     }
-    e.dataTransfer.dropEffect = 'move';
-    return false;
+    return dropIndicator;
 }
 
-function handleDragEnter(e) {
-    if (e.currentTarget !== draggedElement) {
-        e.currentTarget.classList.add('drag-over');
-    }
-}
+function setupContainerDragDrop(container) {
+    // Only set up once — the container element persists across renders
+    if (container._dragDropSetup) return;
+    container._dragDropSetup = true;
 
-function handleDragLeave(e) {
-    e.currentTarget.classList.remove('drag-over');
-}
-
-function handleDrop(e) {
-    if (e.stopPropagation) {
-        e.stopPropagation();
-    }
-    e.preventDefault();
-
-    const dropTarget = e.currentTarget;
-    dropTarget.classList.remove('drag-over');
-
-    if (draggedElement !== dropTarget) {
-        const dropIndex = parseInt(dropTarget.dataset.stageIndex);
-
-        // Swap the stages
-        [stages[draggedIndex], stages[dropIndex]] = [stages[dropIndex], stages[draggedIndex]];
-
-        // Update isFirst property
-        stages[0].isFirst = true;
-        for (let i = 1; i < stages.length; i++) {
-            stages[i].isFirst = false;
+    // Delegate dragstart from handles
+    container.addEventListener('dragstart', (e) => {
+        const handle = e.target.closest('.drag-handle');
+        if (!handle) {
+            e.preventDefault();
+            return;
         }
-
-        // Clear completion states for affected stages
-        const minIndex = Math.min(draggedIndex, dropIndex);
-        for (let i = minIndex; i < stages.length; i++) {
-            if (i > 0) {
-                stages[i].complete = false;
-                stages[i].letterPool = '';
-                stages[i].remainingLetters = '';
-            }
+        draggedIndex = parseInt(handle.dataset.stageIndex);
+        const stageEl = document.getElementById(`stage-${draggedIndex}`);
+        if (stageEl) stageEl.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        // Required for Firefox
+        e.dataTransfer.setData('text/plain', String(draggedIndex));
+        // Use the whole stage element as the drag image
+        if (stageEl) {
+            e.dataTransfer.setDragImage(stageEl, 20, 20);
         }
-
-        // Recalculate letter pools
-        for (let i = 1; i < stages.length; i++) {
-            const prevStage = stages[i - 1];
-            if (prevStage.complete) {
-                stages[i].letterPool = prevStage.remainingLetters;
-            }
-        }
-
-        renderPuzzleBuilder();
-    }
-
-    return false;
-}
-
-function handleDragEnd(e) {
-    e.currentTarget.style.opacity = '1';
-
-    // Remove drag-over class from all stages
-    document.querySelectorAll('.stage').forEach(stage => {
-        stage.classList.remove('drag-over');
     });
+
+    container.addEventListener('dragover', (e) => {
+        if (draggedIndex === null) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+
+        const stageElements = container.querySelectorAll('.stage');
+        const indicator = getDropIndicator();
+        let insertBeforeEl = null;
+        let newDropIndex = stages.length; // default: drop at end
+
+        for (let i = 0; i < stageElements.length; i++) {
+            const rect = stageElements[i].getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+            if (e.clientY < midY) {
+                insertBeforeEl = stageElements[i];
+                newDropIndex = parseInt(stageElements[i].dataset.stageIndex);
+                break;
+            }
+        }
+
+        // Don't show indicator at the dragged item's own position
+        if (newDropIndex === draggedIndex || newDropIndex === draggedIndex + 1) {
+            if (indicator.parentNode) indicator.remove();
+            dropTargetIndex = null;
+            return;
+        }
+
+        dropTargetIndex = newDropIndex;
+
+        if (insertBeforeEl) {
+            container.insertBefore(indicator, insertBeforeEl);
+        } else {
+            // Insert before the "Add Stage" button div
+            const addBtn = container.querySelector('#btn-add-stage');
+            if (addBtn && addBtn.parentNode) {
+                container.insertBefore(indicator, addBtn.parentNode);
+            } else {
+                container.appendChild(indicator);
+            }
+        }
+    });
+
+    container.addEventListener('dragleave', (e) => {
+        // Only remove indicator if truly leaving the container
+        if (!container.contains(e.relatedTarget)) {
+            const indicator = getDropIndicator();
+            if (indicator.parentNode) indicator.remove();
+            dropTargetIndex = null;
+        }
+    });
+
+    container.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const indicator = getDropIndicator();
+        if (indicator.parentNode) indicator.remove();
+
+        if (draggedIndex === null) {
+            cleanupDrag();
+            return;
+        }
+
+        // Use the stored dropTargetIndex from dragover; if it was nulled by
+        // a race condition, fall back to recalculating from mouse position
+        let finalDropIndex = dropTargetIndex;
+        if (finalDropIndex === null) {
+            const stageElements = container.querySelectorAll('.stage');
+            finalDropIndex = stages.length;
+            for (let i = 0; i < stageElements.length; i++) {
+                const rect = stageElements[i].getBoundingClientRect();
+                const midY = rect.top + rect.height / 2;
+                if (e.clientY < midY) {
+                    finalDropIndex = parseInt(stageElements[i].dataset.stageIndex);
+                    break;
+                }
+            }
+            // Still a no-op position after recalc
+            if (finalDropIndex === draggedIndex || finalDropIndex === draggedIndex + 1) {
+                cleanupDrag();
+                return;
+            }
+        }
+
+        // Calculate the actual insertion index after removing the dragged item
+        let insertAt = finalDropIndex;
+        if (insertAt > draggedIndex) {
+            insertAt--; // Adjust because removing the dragged item shifts indices
+        }
+
+        if (insertAt !== draggedIndex) {
+            // Remove stage from old position and insert at new position
+            const [movedStage] = stages.splice(draggedIndex, 1);
+            stages.splice(insertAt, 0, movedStage);
+
+            // Update isFirst property
+            stages[0].isFirst = true;
+            for (let i = 1; i < stages.length; i++) {
+                stages[i].isFirst = false;
+            }
+
+            // Fully recalculate the stage chain from scratch
+            recalculateStageChain();
+
+            renderPuzzleBuilder();
+        } else {
+            cleanupDrag();
+        }
+    });
+
+    container.addEventListener('dragend', () => {
+        cleanupDrag();
+    });
+}
+
+function recalculateStageChainFrom(startIndex) {
+    for (let i = startIndex; i < stages.length; i++) {
+        const stage = stages[i];
+
+        // Rebuild letterPool: previous stage's remaining letters + this stage's random letters
+        if (i === 0) {
+            stage.letterPool = sortString(stage.randomLetters || '');
+        } else {
+            const prevStage = stages[i - 1];
+            const carryOver = prevStage.complete ? prevStage.remainingLetters : '';
+            stage.letterPool = sortString(carryOver + (stage.randomLetters || ''));
+        }
+
+        // Re-validate completion
+        const sourceLetters = stage.sourceWords.join('');
+        const allLetters = (stage.letterPool || '') + sourceLetters;
+
+        if (stage.targetWord && canMakeWord(stage.targetWord, allLetters)) {
+            stage.complete = true;
+            stage.remainingLetters = subtractLetters(allLetters, stage.targetWord);
+        } else {
+            stage.complete = false;
+            stage.remainingLetters = '';
+        }
+    }
+}
+
+function recalculateStageChain() {
+    recalculateStageChainFrom(0);
+}
+
+function cleanupDrag() {
+    if (draggedIndex !== null) {
+        const stageEl = document.getElementById(`stage-${draggedIndex}`);
+        if (stageEl) stageEl.classList.remove('dragging');
+    }
+    const indicator = getDropIndicator();
+    if (indicator.parentNode) indicator.remove();
+    draggedIndex = null;
+    dropTargetIndex = null;
 }
 
 function handleTargetInput(event, stageIndex) {
@@ -1342,7 +1445,7 @@ async function showSuggestions(stageIndex, mode = 'single') {
             includeIncomplete,
             progressCallback,
             0,
-            {futureLetters: futureLettersForSearch, mode}
+            { futureLetters: futureLettersForSearch, mode }
         );
 
         stage.searchInProgress = false;
@@ -1632,41 +1735,8 @@ function selectCombination(stageIndex, combo) {
 }
 
 function autoValidateStage(stageIndex) {
-    const stage = stages[stageIndex];
-    const sourceLetters = stage.sourceWords.join('');
-    const targetWord = stage.targetWord;
-
-    // For non-first stages, combine available letters with source words
-    const availableLetters = stage.letterPool || '';
-    const allLetters = availableLetters + sourceLetters;
-
-    // Check if all letters (available + source) contain what's needed for target word
-    if (!canMakeWord(targetWord, allLetters)) {
-        // Not complete - clear completion status
-        if (stage.complete) {
-            stage.complete = false;
-            stage.remainingLetters = '';
-            // Clear subsequent stages' completion and letter pools
-            for (let i = stageIndex + 1; i < stages.length; i++) {
-                stages[i].complete = false;
-                stages[i].letterPool = '';
-                stages[i].remainingLetters = '';
-            }
-            renderPuzzleBuilder();
-        }
-        return;
-    }
-
-    // Mark stage as complete
-    stage.complete = true;
-    stage.remainingLetters = subtractLetters(allLetters, targetWord);
-
-    // Set up next stage's letter pool
-    if (stageIndex < stages.length - 1) {
-        const nextStage = stages[stageIndex + 1];
-        nextStage.letterPool = stage.remainingLetters;
-    }
-
+    // Recalculate from this stage onwards (cascading through the chain)
+    recalculateStageChainFrom(stageIndex);
     renderPuzzleBuilder();
 }
 
@@ -1675,24 +1745,19 @@ function validateStage(stageIndex) {
     const sourceLetters = stage.sourceWords.join('');
     const targetWord = stage.targetWord;
 
-    // For non-first stages, combine available letters with source words
     const availableLetters = stage.letterPool || '';
     const allLetters = availableLetters + sourceLetters;
 
-    // Check if all letters (available + source) contain what's needed for target word
     if (!canMakeWord(targetWord, allLetters)) {
         showMessage(stageIndex, 'The available letters and source words do not contain all the letters needed to make the target word.', 'error');
         return;
     }
 
-    // Mark stage as complete
-    stage.complete = true;
-    stage.remainingLetters = subtractLetters(allLetters, targetWord);
+    // Recalculate from this stage onwards (cascading through the chain)
+    recalculateStageChainFrom(stageIndex);
 
-    // Set up next stage's letter pool
+    // Show appropriate message
     if (stageIndex < stages.length - 1) {
-        const nextStage = stages[stageIndex + 1];
-        nextStage.letterPool = stage.remainingLetters;
         showMessage(stageIndex, '✓ Stage complete! The remaining letters will be used for the next stage.', 'success');
     } else {
         if (stage.remainingLetters.length === 0) {
@@ -2370,7 +2435,7 @@ class PuzzleAutoSolver {
     async solve() {
         const solution = await this.solveStage(0, '', []);
         if (solution) {
-            return {success: true, stages: solution, remainingLetters: ''};
+            return { success: true, stages: solution, remainingLetters: '' };
         }
         if (this.bestPartial) {
             return {
@@ -2463,7 +2528,7 @@ class PuzzleAutoSolver {
                 false,
                 null,
                 this.config.maxRandomLettersPerStage,
-                {futureLetters: futureLettersForSearch}
+                { futureLetters: futureLettersForSearch }
             ) || [];
 
             const candidateMap = new Map();
@@ -2474,7 +2539,7 @@ class PuzzleAutoSolver {
                     addCountsArray(poolCounts, getCachedWordCounts(word));
                 }
 
-                const {missingCounts, missingTotal} = getMissingLetterInfo(targetCounts, poolCounts);
+                const { missingCounts, missingTotal } = getMissingLetterInfo(targetCounts, poolCounts);
                 if (missingTotal > this.config.maxRandomLettersPerStage) {
                     return;
                 }

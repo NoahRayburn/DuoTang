@@ -157,11 +157,39 @@ main {
     box-shadow: 0 8px 0 #228276;
 }
 
-.stage.drag-over {
-    border: 4px dashed var(--saffron);
-    background: #fdf6e3;
-    transform: scale(1.02);
-    box-shadow: 0 8px 0 #c9a854;
+.stage.dragging {
+    opacity: 0.4;
+    transform: scale(0.98);
+}
+
+.drop-indicator {
+    height: 4px;
+    background: var(--burnt-sienna);
+    border-radius: 2px;
+    margin: -2px 0;
+    position: relative;
+    z-index: 10;
+    box-shadow: 0 0 8px rgba(231, 111, 81, 0.5);
+    pointer-events: none;
+}
+
+.drag-handle {
+    color: #999;
+    font-size: 18px;
+    line-height: 1;
+    cursor: grab;
+    padding: 4px 2px;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: color 0.15s;
+}
+
+.drag-handle:hover {
+    color: var(--burnt-sienna);
+}
+
+.drag-handle:active {
+    cursor: grabbing;
 }
 
 .stage-header {
