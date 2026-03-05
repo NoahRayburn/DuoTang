@@ -3,6 +3,7 @@ let targetWords = [];
 let stages = [];
 let currentStage = 0;
 let allowFirstStageRandom = false;
+let introDialogue = '';
 
 // Utility functions
 function sortString(str) {
@@ -248,6 +249,12 @@ async function findWordCombinations(targetWord, availableLetters = '', minWords 
         pushFirstLetter(targetWord[0]);
     }
 
+    // Add remaining letters of the alphabet to ensure we don't miss words
+    // that start with non-target letters but contain needed letters later
+    for (let c = 97; c <= 122; c++) {
+        pushFirstLetter(String.fromCharCode(c));
+    }
+
     // OPTIMIZED: Use First Letter + Length Index to reduce search space
     // Instead of checking all words, only check words that:
     // 1. Start with a letter from the target word
@@ -317,14 +324,14 @@ async function findWordCombinations(targetWord, availableLetters = '', minWords 
                     });
                 };
 
-                // If we know what letters we're missing, prioritize words that have those letters
-                if (availableLetters && missingLetters.size > 0) {
+                // Prioritize words that provide missing letters or future letters
+                if (missingLetters.size > 0) {
                     if (coverageStats.missingCoverage > 0) {
                         pushCandidate();
                         continue;
                     }
 
-                    if (includeIncomplete && coverageStats.targetCoverage > 0) {
+                    if (coverageStats.futureCoverage > 0 || includeIncomplete) {
                         pushCandidate();
                     }
                 } else {
@@ -549,7 +556,8 @@ function addStage() {
         remainingLetters: '',
         complete: false,
         isFirst: stages.length === 0,
-        randomLetters: ''
+        randomLetters: '',
+        dialogue: ''
     };
 
     // Set letter pool from previous stage if it exists and is complete
@@ -624,7 +632,8 @@ document.addEventListener('DOMContentLoaded', () => {
             remainingLetters: '',
             complete: false,
             isFirst: true,
-            randomLetters: ''
+            randomLetters: '',
+            dialogue: ''
         },
         {
             targetWord: '',
@@ -633,7 +642,8 @@ document.addEventListener('DOMContentLoaded', () => {
             remainingLetters: '',
             complete: false,
             isFirst: false,
-            randomLetters: ''
+            randomLetters: '',
+            dialogue: ''
         }
     ];
     targetWords = ['', ''];
@@ -855,7 +865,19 @@ function createStageElement(stage, index) {
                     </div>
                 ` : ''}
 
-                <div id="message-${index}" style="margin-top: 8px;"></div>
+                <div id="message-${index}" style="margin-top: 8px; margin-bottom: 12px;"></div>
+
+                <div style="border-top: 1px solid #e0e0e0; padding-top: 12px;">
+                    <input
+                        type="text"
+                        id="dialogue-input-${index}"
+                        value="${stage.dialogue || ''}"
+                        placeholder="Dialogue (optional)"
+                        onblur="updateDialogue(${index}, this.value)"
+                        onkeypress="handleDialogueInput(event, ${index})"
+                        style="width: 100%; padding: 8px 12px; font-size: 14px; border: 2px solid #e0e0e0; border-radius: 4px; background: #fff;"
+                    >
+                </div>
             </div>
         ` : ''}
     `;
@@ -1063,6 +1085,18 @@ function handleTargetInput(event, stageIndex) {
         updateTargetWord(stageIndex, input.value);
         input.blur(); // Remove focus from input
     }
+}
+
+function handleDialogueInput(event, stageIndex) {
+    if (event.key === 'Enter') {
+        const input = document.getElementById(`dialogue-input-${stageIndex}`);
+        updateDialogue(stageIndex, input.value);
+        input.blur();
+    }
+}
+
+function updateDialogue(index, value) {
+    stages[index].dialogue = value.trim();
 }
 
 function handleSourceInput(event, stageIndex) {
@@ -1828,7 +1862,8 @@ function updateSummary() {
         html += `
             <div style="margin-top: 20px;">
                 <button class="btn btn-primary" onclick="sharePuzzle()">Share Puzzle</button>
-                <button class="btn btn-secondary" style="margin-left: 8px;" onclick="exportPlainText()">Export Plain Text</button>
+                <button class="btn btn-secondary" style="margin-left: 8px;" onclick="exportJSON()">Export JSON</button>
+                <button class="btn btn-secondary" style="margin-left: 8px;" onclick="openImportModal()">Import JSON</button>
                 <button class="btn btn-secondary" style="margin-left: 8px;" onclick="startOver()">Start Over</button>
             </div>
         `;
@@ -1895,66 +1930,171 @@ function sharePuzzle() {
     });
 }
 
-function exportPlainText() {
-    // Create detailed plain text export
-    let plainText = `DuoTang Puzzle\n`;
-    plainText += `=`.repeat(50) + `\n\n`;
-
-    const lastStage = stages[stages.length - 1];
-    const finalLettersRemaining = lastStage.remainingLetters;
-
-    plainText += `Total Stages: ${stages.length}\n`;
-    plainText += `Status: ${finalLettersRemaining.length === 0 ? 'Perfect (no letters remaining)' : `${finalLettersRemaining.length} letters remaining`}\n\n`;
-
-    stages.forEach((stage, index) => {
-        plainText += `Stage ${index + 1}: ${stage.targetWord.toUpperCase()}\n`;
-        plainText += `-`.repeat(30) + `\n`;
-
-        if (stage.sourceWords.length > 0) {
-            plainText += `Source Words: ${stage.sourceWords.join(', ')}\n`;
-        } else {
-            plainText += `Source Words: (none - using available letters only)\n`;
-        }
-
-        if (stage.letterPool) {
-            plainText += `Available Letters: ${stage.letterPool.toUpperCase()}\n`;
-        }
-
-        if (stage.randomLetters) {
-            plainText += `Random Letters: ${stage.randomLetters.toUpperCase()} (${stage.randomLetters.length})\n`;
-        }
-
-        if (stage.remainingLetters) {
-            plainText += `Remaining: ${stage.remainingLetters.toUpperCase()}\n`;
-        }
-
-        plainText += `\n`;
-    });
-
-    if (finalLettersRemaining.length > 0) {
-        plainText += `Final Remaining Letters: ${finalLettersRemaining.toUpperCase()}\n`;
+function exportJSON() {
+    // Make sure we have the latest intro dialogue content
+    const introDialogueInput = document.getElementById('intro-dialogue-input');
+    if (introDialogueInput) {
+        introDialogue = introDialogueInput.value.trim();
     }
 
-    // Create download link
-    const blob = new Blob([plainText], { type: 'text/plain' });
+    const exportData = {
+        introDialogue: introDialogue,
+        introWords: stages.length > 0 ? stages[0].sourceWords : [],
+        introLooseLetters: stages.length > 0 ? (stages[0].randomLetters || "") : "",
+        stages: stages.map((stage, index) => {
+            const nextStage = stages[index + 1];
+            return {
+                targetWord: stage.targetWord,
+                dialogue: stage.dialogue || "",
+                rewardWords: nextStage ? nextStage.sourceWords : [],
+                rewardLooseLetters: nextStage ? (nextStage.randomLetters || "") : ""
+            };
+        })
+    };
+
+    const jsonStr = JSON.stringify(exportData, null, 2);
+
+    const modal = document.getElementById('export-modal');
+    if (modal) {
+        document.getElementById('export-json-content').value = jsonStr;
+        modal.style.display = 'flex';
+    }
+}
+
+function copyExportJSON() {
+    const content = document.getElementById('export-json-content').value;
+    navigator.clipboard.writeText(content).then(() => {
+        const status = document.getElementById('export-copy-status');
+        status.textContent = 'Copied!';
+        setTimeout(() => status.textContent = '', 2000);
+    });
+}
+
+function downloadExportJSON() {
+    const content = document.getElementById('export-json-content').value;
+    const blob = new Blob([content], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'duotang-puzzle.txt';
+    a.download = 'duotang-puzzle.json';
     a.click();
     URL.revokeObjectURL(url);
+}
 
-    // Also show confirmation
-    const statusDiv = document.getElementById('auto-generate-status');
-    if (statusDiv) {
-        statusDiv.innerHTML = '<span style="color: #28a745;">✓ Puzzle exported as plain text file</span>';
-        setTimeout(() => statusDiv.innerHTML = '', 3000);
+function closeExportModal() {
+    const modal = document.getElementById('export-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function openImportModal() {
+    const modal = document.getElementById('import-modal');
+    if (modal) {
+        document.getElementById('import-json-content').value = '';
+        modal.style.display = 'flex';
+    }
+}
+
+function closeImportModal() {
+    const modal = document.getElementById('import-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        document.getElementById('import-json-content').value = e.target.result;
+    };
+    reader.readAsText(file);
+
+    // Reset the input so the same file can be selected again
+    event.target.value = '';
+}
+
+function importJSON() {
+    const content = document.getElementById('import-json-content').value.trim();
+    if (!content) {
+        alert("Please paste JSON content or select a file.");
+        return;
+    }
+
+    try {
+        const data = JSON.parse(content);
+
+        // Validate required fields
+        if (!data.stages || !Array.isArray(data.stages)) {
+            throw new Error("Invalid JSON: 'stages' array is missing.");
+        }
+
+        // Reconstruct stages
+        const newStages = [];
+
+        for (let i = 0; i < data.stages.length; i++) {
+            const stageData = data.stages[i];
+
+            // Reconstruct sourceWords and randomLetters for the CURRENT stage
+            // Stage 0 comes from introWords/introLooseLetters
+            // Stage N comes from stage[N-1].rewardWords/rewardLooseLetters
+            let sourceWords = [];
+            let randomLetters = "";
+
+            if (i === 0) {
+                sourceWords = data.introWords || [];
+                randomLetters = data.introLooseLetters || "";
+            } else {
+                const prevStage = data.stages[i - 1];
+                sourceWords = prevStage.rewardWords || [];
+                randomLetters = prevStage.rewardLooseLetters || "";
+            }
+
+            const stage = {
+                targetWord: stageData.targetWord || '',
+                dialogue: stageData.dialogue || '',
+                sourceWords: sourceWords,
+                letterPool: '', // Will be calculated by renderPuzzleBuilder or generate step
+                remainingLetters: '', // Will be calculated
+                complete: false,
+                isFirst: i === 0,
+                randomLetters: randomLetters
+            };
+
+            newStages.push(stage);
+        }
+
+        // Apply the new state
+        stages = newStages;
+        targetWords = stages.map(s => s.targetWord);
+        currentStage = 0;
+
+        introDialogue = data.introDialogue || '';
+        const introInput = document.getElementById('intro-dialogue-input');
+        if (introInput) introInput.value = introDialogue;
+
+        recalculateStageChain();
+
+        closeImportModal();
+        renderPuzzleBuilder();
+
+        // Update inputs
+        stages.forEach((stage, index) => {
+            const input = document.getElementById(`target-input-${index}`);
+            if (input) input.value = stage.targetWord;
+        });
+
+    } catch (error) {
+        alert("Error importing JSON: " + error.message);
     }
 }
 
 function startOver() {
     if (confirm('Are you sure you want to start over? This will clear all your progress.')) {
         targetWords = [];
+        introDialogue = '';
+        const introInput = document.getElementById('intro-dialogue-input');
+        if (introInput) introInput.value = '';
+
         stages = [];
         currentStage = 0;
 
