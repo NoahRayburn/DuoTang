@@ -46,7 +46,7 @@ function getBaseLetterPool() {
 }
 
 // Utility: Get full letter pool including both extra letters
-function getLetterPool() {
+function getSlotLetterPool() {
     let pool = getBaseLetterPool();
     if (slotPuzzleState.extraLetter1) pool += slotPuzzleState.extraLetter1.toLowerCase();
     if (slotPuzzleState.extraLetter2) pool += slotPuzzleState.extraLetter2.toLowerCase();
@@ -54,7 +54,7 @@ function getLetterPool() {
 }
 
 // Utility: Check if word is in dictionary
-function isInDictionary(word) {
+function slotIsInDictionary(word) {
     if (typeof currentWordSet !== 'undefined') {
         return currentWordSet.has(word.toLowerCase());
     }
@@ -62,15 +62,15 @@ function isInDictionary(word) {
 }
 
 // Handle Enter key on source word input
-function handleSourceWordKeypress(event) {
+function slotHandleSourceWordKeypress(event) {
     if (event.key === 'Enter') {
         event.preventDefault();
-        addSourceWord();
+        slotAddSourceWord();
     }
 }
 
 // Add a new source word
-function addSourceWord() {
+function slotAddSourceWord() {
     const input = document.getElementById('new-source-word-input');
     const word = input.value.trim().toLowerCase();
 
@@ -79,19 +79,19 @@ function addSourceWord() {
     slotPuzzleState.sourceWords.push(word);
     input.value = '';
 
-    renderSourceWords();
-    renderLetterPool();
-    renderTargetWords();
-    updateSummary();
+    slotRenderSourceWords();
+    slotRenderLetterPool();
+    slotRenderTargetWords();
+    slotUpdateSummary();
 }
 
 // Remove a source word
-function removeSourceWord(index) {
+function slotRemoveSourceWord(index) {
     slotPuzzleState.sourceWords.splice(index, 1);
-    renderSourceWords();
-    renderLetterPool();
-    renderTargetWords();
-    updateSummary();
+    slotRenderSourceWords();
+    slotRenderLetterPool();
+    slotRenderTargetWords();
+    slotUpdateSummary();
 }
 
 // Update extra letter 1
@@ -101,10 +101,10 @@ function updateExtraLetter1() {
     slotPuzzleState.extraLetter1 = letter;
     input.value = letter.toUpperCase();
 
-    renderExtraLetters();
-    renderLetterPool();
-    renderTargetWords();
-    updateSummary();
+    slotRenderExtraLetters();
+    slotRenderLetterPool();
+    slotRenderTargetWords();
+    slotUpdateSummary();
 }
 
 // Update extra letter 2
@@ -114,31 +114,31 @@ function updateExtraLetter2() {
     slotPuzzleState.extraLetter2 = letter;
     input.value = letter.toUpperCase();
 
-    renderExtraLetters();
-    renderLetterPool();
-    renderTargetWords();
-    updateSummary();
+    slotRenderExtraLetters();
+    slotRenderLetterPool();
+    slotRenderTargetWords();
+    slotUpdateSummary();
 }
 
 // Update a target word
-function updateTargetWord(index, value) {
+function updateSlotTargetWord(index, value) {
     slotPuzzleState.targetWords[index] = value.trim().toLowerCase();
-    renderTargetWords();
-    updateSummary();
+    slotRenderTargetWords();
+    slotUpdateSummary();
 }
 
 // Validate target word based on slot puzzle rules:
 // - Target 1: must use extra letter 1
 // - Target 2: must use extra letter 2
 // - Target 3: must use BOTH extra letters
-function validateTargetWord(word, index) {
+function slotValidateTargetWord(word, index) {
     if (!word) return { valid: null, icon: '', color: '#e0e0e0', message: '' };
 
     const basePool = getBaseLetterPool();
-    const fullPool = getLetterPool();
+    const fullPool = getSlotLetterPool();
     const letter1 = slotPuzzleState.extraLetter1;
     const letter2 = slotPuzzleState.extraLetter2;
-    const inDict = isInDictionary(word);
+    const inDict = slotIsInDictionary(word);
 
     // First check: can the word be made from the full pool?
     const canMake = canMakeWordFromPool(word, fullPool);
@@ -239,8 +239,9 @@ function validateTargetWord(word, index) {
 }
 
 // Render source words list
-function renderSourceWords() {
+function slotRenderSourceWords() {
     const container = document.getElementById('source-words-list');
+    if (!container) return;
 
     if (slotPuzzleState.sourceWords.length === 0) {
         container.innerHTML = '<p style="font-size: 12px; color: #999; font-style: italic;">No source words added yet</p>';
@@ -250,11 +251,11 @@ function renderSourceWords() {
     container.innerHTML = `
         <div class="selected-source-tags">
             ${slotPuzzleState.sourceWords.map((word, index) => {
-        const inDict = isInDictionary(word);
+        const inDict = slotIsInDictionary(word);
         return `
                     <div class="source-tag" style="background: ${inDict ? 'var(--persian-green)' : '#ffc107'}; color: ${inDict ? 'white' : '#333'};">
                         ${!inDict ? '⚠️ ' : ''}${word.toUpperCase()}
-                        <span class="remove" onclick="removeSourceWord(${index})">&times;</span>
+                        <span class="remove" onclick="slotRemoveSourceWord(${index})">&times;</span>
                     </div>
                 `;
     }).join('')}
@@ -263,8 +264,9 @@ function renderSourceWords() {
 }
 
 // Render extra letters tiles
-function renderExtraLetters() {
+function slotRenderExtraLetters() {
     const container = document.getElementById('extra-letters-display');
+    if (!container) return;
     const letters = [];
 
     if (slotPuzzleState.extraLetter1) {
@@ -278,10 +280,11 @@ function renderExtraLetters() {
 }
 
 // Render letter pool preview
-function renderLetterPool() {
+function slotRenderLetterPool() {
     const container = document.getElementById('letter-pool-display');
     const statsContainer = document.getElementById('letter-pool-stats');
-    const pool = getLetterPool();
+    if (!container || !statsContainer) return;
+    const pool = getSlotLetterPool();
 
     if (!pool) {
         container.innerHTML = '<span style="font-size: 12px; color: #999;">Add source words or letters above...</span>';
@@ -304,19 +307,20 @@ function renderLetterPool() {
 }
 
 // Render target words with validation
-function renderTargetWords() {
+function slotRenderTargetWords() {
     const container = document.getElementById('target-words-list');
+    if (!container) return;
     const letter1 = slotPuzzleState.extraLetter1;
     const letter2 = slotPuzzleState.extraLetter2;
 
     const targetLabels = [
         `Target 1 (uses "${letter1 ? letter1.toUpperCase() : '?'}")`,
         `Target 2 (uses "${letter2 ? letter2.toUpperCase() : '?'}")`,
-        `Target 3 (uses both "${letter1 ? letter1.toUpperCase() : '?'}" + "${letter2 ? letter2.toUpperCase() : '?"}")`
+        `Target 3 (uses both "${letter1 ? letter1.toUpperCase() : '?'}" + "${letter2 ? letter2.toUpperCase() : '?'}")`
     ];
 
     container.innerHTML = slotPuzzleState.targetWords.map((word, index) => {
-        const validation = validateTargetWord(word, index);
+        const validation = slotValidateTargetWord(word, index);
 
         return `
             <div style="margin-bottom: 16px;">
@@ -328,7 +332,7 @@ function renderTargetWords() {
                         value="${word}" 
                         placeholder="Enter word..." 
                         style="flex: 1; padding: 8px 12px; font-size: 14px; border: 3px solid ${validation.color}; border-radius: 12px; font-weight: 600;"
-                        oninput="updateTargetWord(${index}, this.value)"
+                        oninput="updateSlotTargetWord(${index}, this.value)"
                     >
                     <span style="font-size: 20px; min-width: 28px; text-align: center;">${validation.icon}</span>
                 </div>
@@ -339,12 +343,13 @@ function renderTargetWords() {
 }
 
 // Update puzzle summary
-function updateSummary() {
+function slotUpdateSummary() {
     const summaryPanel = document.getElementById('slot-puzzle-summary');
     const summaryContent = document.getElementById('slot-summary-content');
+    if (!summaryPanel || !summaryContent) return;
 
     const filledTargets = slotPuzzleState.targetWords.filter(w => w.trim());
-    const validTargets = slotPuzzleState.targetWords.map((w, i) => validateTargetWord(w, i)).filter(v => v.valid === true);
+    const validTargets = slotPuzzleState.targetWords.map((w, i) => slotValidateTargetWord(w, i)).filter(v => v.valid === true);
 
     if (slotPuzzleState.sourceWords.length === 0 && !slotPuzzleState.extraLetter1 && !slotPuzzleState.extraLetter2) {
         summaryPanel.style.display = 'none';
@@ -383,7 +388,7 @@ function updateSummary() {
                 <div style="display: flex; flex-wrap: wrap; gap: 8px;">
                     ${slotPuzzleState.targetWords.map((w, i) => {
         if (!w) return `<span style="color: #999; background: #f5f5f5; padding: 4px 10px; border-radius: 12px; border: 2px dashed #ccc;">Target ${i + 1}</span>`;
-        const validation = validateTargetWord(w, i);
+        const validation = slotValidateTargetWord(w, i);
         return `<span style="background: ${validation.valid ? 'var(--persian-green)' : 'var(--burnt-sienna)'}; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 700; border: 2px solid ${validation.valid ? '#228276' : '#c05640'};">${w.toUpperCase()} ${validation.valid ? '✓' : '✗'}</span>`;
     }).join('')}
                 </div>
@@ -398,11 +403,11 @@ function updateSummary() {
     `;
 }
 
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', () => {
-    renderSourceWords();
-    renderExtraLetters();
-    renderLetterPool();
-    renderTargetWords();
-    updateSummary();
-});
+// Initialize slot puzzle tab
+function initSlotPuzzle() {
+    slotRenderSourceWords();
+    slotRenderExtraLetters();
+    slotRenderLetterPool();
+    slotRenderTargetWords();
+    slotUpdateSummary();
+}

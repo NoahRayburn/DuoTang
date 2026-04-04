@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Word Puzzle Builder</title>
+    <title>DuoTang - Puzzle Builder</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 
@@ -13,214 +13,421 @@
         <header>
             <h1>DuoTang</h1>
             <p class="subtitle">Puzzle Builder</p>
-            <a href="slot-puzzle.html"
-                style="position: absolute; top: 16px; right: 16px; color: var(--persian-green); text-decoration: none; font-weight: 700; font-size: 14px;">Slot
-                Puzzle →</a>
         </header>
 
+        <!-- Tab Navigation -->
+        <div class="tab-bar">
+            <button class="tab-btn active" onclick="switchTab('puzzle-builder')">Puzzle Builder</button>
+            <button class="tab-btn" onclick="switchTab('word-finder')">Word Finder</button>
+            <button class="tab-btn" onclick="switchTab('slot-puzzle')">Slot Puzzle</button>
+        </div>
+
         <main>
-            <section id="puzzle-config">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                    <h2 style="margin: 0;">Puzzle Stages</h2>
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <button id="btn-toggle-filters" class="btn btn-secondary" onclick="toggleGlobalFilters()">🔍
-                            Filters</button>
-                    </div>
-                </div>
-
-                <div id="global-filters"
-                    style="display: none; margin-bottom: 16px; padding: 12px; background: #fdf6e3; border: 3px solid var(--saffron); border-radius: 15px;">
-                    <div style="font-size: 13px; font-weight: 700; margin-bottom: 8px; color: var(--charcoal);">Filters
-                        (apply to all suggestions)</div>
-                    <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 12px; max-width: 400px;">
-                        <div style="flex: 1;">
-                            <label style="font-size: 12px; color: var(--charcoal); font-weight: 600;">Min
-                                Length:</label>
-                            <input type="number" id="global-min-length" value="2" min="1" max="20"
-                                style="width: 100%; padding: 6px 8px; font-size: 13px; border: 3px solid var(--persian-green); border-radius: 8px; font-weight: 600;">
-                        </div>
-                        <div style="flex: 1;">
-                            <label style="font-size: 12px; color: var(--charcoal); font-weight: 600;">Max
-                                Length:</label>
-                            <input type="number" id="global-max-length" value="10" min="1" max="20"
-                                style="width: 100%; padding: 6px 8px; font-size: 13px; border: 3px solid var(--persian-green); border-radius: 8px; font-weight: 600;">
+            <!-- ==================== TAB 1: PUZZLE BUILDER ==================== -->
+            <div id="tab-puzzle-builder" class="tab-content active">
+                <section id="puzzle-config">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h2 style="margin: 0;">Puzzle Stages</h2>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button id="btn-toggle-filters" class="btn btn-secondary" onclick="toggleGlobalFilters()">🔍
+                                Filters</button>
                         </div>
                     </div>
-                    <div style="max-width: 600px; margin-bottom: 12px;">
-                        <label style="font-size: 12px; color: var(--charcoal); font-weight: 600;">Ignore Words
-                            (comma-separated):</label>
-                        <input type="text" id="global-ignore-words" placeholder="e.g., the, and, but"
-                            style="width: 100%; padding: 6px 8px; font-size: 13px; border: 3px solid var(--persian-green); border-radius: 8px; font-weight: 600;">
-                        <div style="font-size: 11px; color: #666; margin-top: 4px;">These words will be excluded from
-                            all suggestions</div>
+
+                    <div id="global-filters"
+                        style="display: none; margin-bottom: 16px; padding: 12px; background: #fdf6e3; border: 3px solid var(--saffron); border-radius: 15px;">
+                        <div style="font-size: 13px; font-weight: 700; margin-bottom: 8px; color: var(--charcoal);">
+                            Filters
+                            (apply to all suggestions)</div>
+                        <div
+                            style="display: flex; gap: 12px; align-items: center; margin-bottom: 12px; max-width: 400px;">
+                            <div style="flex: 1;">
+                                <label style="font-size: 12px; color: var(--charcoal); font-weight: 600;">Min
+                                    Length:</label>
+                                <input type="number" id="global-min-length" value="2" min="1" max="20"
+                                    style="width: 100%; padding: 6px 8px; font-size: 13px; border: 3px solid var(--persian-green); border-radius: 8px; font-weight: 600;">
+                            </div>
+                            <div style="flex: 1;">
+                                <label style="font-size: 12px; color: var(--charcoal); font-weight: 600;">Max
+                                    Length:</label>
+                                <input type="number" id="global-max-length" value="10" min="1" max="20"
+                                    style="width: 100%; padding: 6px 8px; font-size: 13px; border: 3px solid var(--persian-green); border-radius: 8px; font-weight: 600;">
+                            </div>
+                        </div>
+                        <div style="max-width: 600px; margin-bottom: 12px;">
+                            <label style="font-size: 12px; color: var(--charcoal); font-weight: 600;">Ignore Words
+                                (comma-separated):</label>
+                            <input type="text" id="global-ignore-words" placeholder="e.g., the, and, but"
+                                style="width: 100%; padding: 6px 8px; font-size: 13px; border: 3px solid var(--persian-green); border-radius: 8px; font-weight: 600;">
+                            <div style="font-size: 11px; color: #666; margin-top: 4px;">These words will be excluded
+                                from
+                                all suggestions</div>
+                        </div>
+                        <div style="max-width: 600px;">
+                            <label
+                                style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--charcoal); font-weight: 600; cursor: pointer;">
+                                <input type="checkbox" id="use-expanded-wordlist" onchange="toggleWordList()"
+                                    style="cursor: pointer;">
+                                <span>Use Expanded Word List (~6,800 words)</span>
+                            </label>
+                            <div style="font-size: 11px; color: #666; margin-top: 4px; margin-left: 24px;">Includes
+                                abstract
+                                nouns and less common words. Default uses filtered list (~5,600 concrete nouns).</div>
+                        </div>
                     </div>
-                    <div style="max-width: 600px;">
-                        <label
-                            style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--charcoal); font-weight: 600; cursor: pointer;">
-                            <input type="checkbox" id="use-expanded-wordlist" onchange="toggleWordList()"
-                                style="cursor: pointer;">
-                            <span>Use Expanded Word List (~6,800 words)</span>
-                        </label>
-                        <div style="font-size: 11px; color: #666; margin-top: 4px; margin-left: 24px;">Includes abstract
-                            nouns and less common words. Default uses filtered list (~5,600 concrete nouns).</div>
+
+                    <div id="intro-dialogue-container"
+                        style="margin-bottom: 24px; padding: 16px; background: #fdfdfd; border: 2px solid #e0e0e0; border-radius: 8px;">
+                        <h3 style="margin: 0 0 8px 0; color: var(--charcoal); font-size: 16px;">Level Introduction</h3>
+                        <input type="text" id="intro-dialogue-input" placeholder="Intro Dialogue (optional)"
+                            style="width: 100%; padding: 8px 12px; font-size: 14px; border: 2px solid #e0e0e0; border-radius: 4px; background: #fff;">
                     </div>
-                </div>
 
-                <div id="intro-dialogue-container"
-                    style="margin-bottom: 24px; padding: 16px; background: #fdfdfd; border: 2px solid #e0e0e0; border-radius: 8px;">
-                    <h3 style="margin: 0 0 8px 0; color: var(--charcoal); font-size: 16px;">Level Introduction</h3>
-                    <input type="text" id="intro-dialogue-input" placeholder="Intro Dialogue (optional)"
-                        style="width: 100%; padding: 8px 12px; font-size: 14px; border: 2px solid #e0e0e0; border-radius: 4px; background: #fff;">
-                </div>
-
-                <div id="puzzle-builder">
-                    <!-- Dynamically populated stages will go here -->
-                </div>
-
-                <div
-                    style="margin: 20px 0; padding: 12px; background: #f5f5f5; border: 2px solid #e0e0e0; border-radius: 8px; text-align: center; display: flex; flex-direction: column; gap: 8px; align-items: center;">
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <button id="btn-auto-generate" class="btn btn-secondary" onclick="autoGeneratePuzzle()"
-                            style="font-size: 13px; padding: 6px 16px;">
-                            Auto Generate Puzzle
-                        </button>
-                        <button class="btn btn-secondary" onclick="clearSourceWords()"
-                            style="font-size: 13px; padding: 6px 16px;">
-                            Clear Source Words
-                        </button>
-                        <button class="btn btn-secondary" onclick="openImportModal()"
-                            style="font-size: 13px; padding: 6px 16px;">
-                            Import JSON
-                        </button>
+                    <div id="puzzle-builder">
+                        <!-- Dynamically populated stages will go here -->
                     </div>
-                    <label style="display: inline-flex; gap: 6px; align-items: center; font-size: 12px; color: #555;">
-                        <input type="checkbox" id="allow-first-stage-random" onchange="handleFirstStageRandomToggle()">
-                        <span>Allow auto generation to add random letters on Stage 1</span>
-                    </label>
-                    <div style="font-size: 11px; color: #888; margin-top: 6px;">
-                        Fill in target words, then click to auto-generate source words for all stages
-                    </div>
-                    <div id="auto-generate-status" style="margin-top: 8px; font-size: 12px; font-weight: 600;"></div>
-                </div>
-
-                <div id="puzzle-summary" class="summary-panel" style="display: none;">
-                    <h3>Puzzle Summary</h3>
-                    <div id="summary-content"></div>
-                </div>
-
-                <div id="word-browser"
-                    style="display: none; margin-top: 24px; padding: 16px; background: #f9f9f9; border: 2px solid var(--persian-green); border-radius: 12px;">
-                    <h3 style="margin: 0 0 12px 0; color: var(--charcoal);">Word Browser</h3>
-                    <div id="browser-letters"></div>
 
                     <div
-                        style="margin: 12px 0; padding: 12px; background: #fff; border: 2px solid #e0e0e0; border-radius: 8px;">
-                        <div style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;">
-                            <div style="flex: 0 0 100px;">
-                                <label
-                                    style="font-size: 12px; color: var(--charcoal); font-weight: 600; display: block; margin-bottom: 4px;">Min
-                                    Length:</label>
-                                <input type="number" id="browser-min-length" value="2" min="1" max="20"
-                                    style="width: 100%; padding: 6px 8px; font-size: 13px; border: 2px solid var(--persian-green); border-radius: 8px; font-weight: 600;">
-                            </div>
-                            <div style="flex: 0 0 100px;">
-                                <label
-                                    style="font-size: 12px; color: var(--charcoal); font-weight: 600; display: block; margin-bottom: 4px;">Max
-                                    Length:</label>
-                                <input type="number" id="browser-max-length" value="10" min="1" max="20"
-                                    style="width: 100%; padding: 6px 8px; font-size: 13px; border: 2px solid var(--persian-green); border-radius: 8px; font-weight: 600;">
-                            </div>
-                            <div style="flex: 0 0 120px;">
-                                <label
-                                    style="font-size: 12px; color: var(--charcoal); font-weight: 600; display: block; margin-bottom: 4px;">First
-                                    Letter:</label>
-                                <select id="browser-first-letter"
-                                    style="width: 100%; padding: 6px 8px; font-size: 13px; border: 2px solid var(--persian-green); border-radius: 8px; font-weight: 600;">
-                                    <option value="">All</option>
-                                    <option value="a">A</option>
-                                    <option value="b">B</option>
-                                    <option value="c">C</option>
-                                    <option value="d">D</option>
-                                    <option value="e">E</option>
-                                    <option value="f">F</option>
-                                    <option value="g">G</option>
-                                    <option value="h">H</option>
-                                    <option value="i">I</option>
-                                    <option value="j">J</option>
-                                    <option value="k">K</option>
-                                    <option value="l">L</option>
-                                    <option value="m">M</option>
-                                    <option value="n">N</option>
-                                    <option value="o">O</option>
-                                    <option value="p">P</option>
-                                    <option value="q">Q</option>
-                                    <option value="r">R</option>
-                                    <option value="s">S</option>
-                                    <option value="t">T</option>
-                                    <option value="u">U</option>
-                                    <option value="v">V</option>
-                                    <option value="w">W</option>
-                                    <option value="x">X</option>
-                                    <option value="y">Y</option>
-                                    <option value="z">Z</option>
-                                </select>
-                            </div>
-                            <div style="flex: 0 0 auto;">
-                                <label
-                                    style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--charcoal); font-weight: 600; cursor: pointer;">
-                                    <input type="checkbox" id="browser-sort-alpha" style="cursor: pointer;">
-                                    <span>Sort Alphabetically</span>
-                                </label>
-                            </div>
+                        style="margin: 20px 0; padding: 12px; background: #f5f5f5; border: 2px solid #e0e0e0; border-radius: 8px; text-align: center; display: flex; flex-direction: column; gap: 8px; align-items: center;">
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button id="btn-auto-generate" class="btn btn-secondary" onclick="autoGeneratePuzzle()"
+                                style="font-size: 13px; padding: 6px 16px;">
+                                Auto Generate Puzzle
+                            </button>
+                            <button class="btn btn-secondary" onclick="clearSourceWords()"
+                                style="font-size: 13px; padding: 6px 16px;">
+                                Clear Source Words
+                            </button>
+                            <button class="btn btn-secondary" onclick="openImportModal()"
+                                style="font-size: 13px; padding: 6px 16px;">
+                                Import JSON
+                            </button>
+                        </div>
+                        <label
+                            style="display: inline-flex; gap: 6px; align-items: center; font-size: 12px; color: #555;">
+                            <input type="checkbox" id="allow-first-stage-random"
+                                onchange="handleFirstStageRandomToggle()">
+                            <span>Allow auto generation to add random letters on Stage 1</span>
+                        </label>
+                        <div style="font-size: 11px; color: #888; margin-top: 6px;">
+                            Fill in target words, then click to auto-generate source words for all stages
+                        </div>
+                        <div id="auto-generate-status" style="margin-top: 8px; font-size: 12px; font-weight: 600;">
                         </div>
                     </div>
 
-                    <div style="margin: 12px 0; display: flex; gap: 8px;">
-                        <button class="btn btn-secondary" onclick="browseWords('single')">Browse Single Words</button>
-                        <button class="btn btn-secondary" onclick="browseWords('combo')">Browse Combinations</button>
-                        <button class="btn btn-secondary btn-small" onclick="applyBrowserFilters()"
-                            style="padding: 6px 12px;">Apply Filters</button>
-                        <button class="btn btn-secondary btn-small" onclick="hideBrowserResults()"
-                            style="padding: 6px 12px;">Hide Results</button>
+                    <div id="puzzle-summary" class="summary-panel" style="display: none;">
+                        <h3>Puzzle Summary</h3>
+                        <div id="summary-content"></div>
                     </div>
-                    <div id="browser-results" class="suggestions-list" style="display: none;"></div>
+
+                    <div id="word-browser"
+                        style="display: none; margin-top: 24px; padding: 16px; background: #f9f9f9; border: 2px solid var(--persian-green); border-radius: 12px;">
+                        <h3 style="margin: 0 0 12px 0; color: var(--charcoal);">Word Browser</h3>
+                        <div id="browser-letters"></div>
+
+                        <div
+                            style="margin: 12px 0; padding: 12px; background: #fff; border: 2px solid #e0e0e0; border-radius: 8px;">
+                            <div style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;">
+                                <div style="flex: 0 0 100px;">
+                                    <label
+                                        style="font-size: 12px; color: var(--charcoal); font-weight: 600; display: block; margin-bottom: 4px;">Min
+                                        Length:</label>
+                                    <input type="number" id="browser-min-length" value="2" min="1" max="20"
+                                        style="width: 100%; padding: 6px 8px; font-size: 13px; border: 2px solid var(--persian-green); border-radius: 8px; font-weight: 600;">
+                                </div>
+                                <div style="flex: 0 0 100px;">
+                                    <label
+                                        style="font-size: 12px; color: var(--charcoal); font-weight: 600; display: block; margin-bottom: 4px;">Max
+                                        Length:</label>
+                                    <input type="number" id="browser-max-length" value="10" min="1" max="20"
+                                        style="width: 100%; padding: 6px 8px; font-size: 13px; border: 2px solid var(--persian-green); border-radius: 8px; font-weight: 600;">
+                                </div>
+                                <div style="flex: 0 0 120px;">
+                                    <label
+                                        style="font-size: 12px; color: var(--charcoal); font-weight: 600; display: block; margin-bottom: 4px;">First
+                                        Letter:</label>
+                                    <select id="browser-first-letter"
+                                        style="width: 100%; padding: 6px 8px; font-size: 13px; border: 2px solid var(--persian-green); border-radius: 8px; font-weight: 600;">
+                                        <option value="">All</option>
+                                        <option value="a">A</option>
+                                        <option value="b">B</option>
+                                        <option value="c">C</option>
+                                        <option value="d">D</option>
+                                        <option value="e">E</option>
+                                        <option value="f">F</option>
+                                        <option value="g">G</option>
+                                        <option value="h">H</option>
+                                        <option value="i">I</option>
+                                        <option value="j">J</option>
+                                        <option value="k">K</option>
+                                        <option value="l">L</option>
+                                        <option value="m">M</option>
+                                        <option value="n">N</option>
+                                        <option value="o">O</option>
+                                        <option value="p">P</option>
+                                        <option value="q">Q</option>
+                                        <option value="r">R</option>
+                                        <option value="s">S</option>
+                                        <option value="t">T</option>
+                                        <option value="u">U</option>
+                                        <option value="v">V</option>
+                                        <option value="w">W</option>
+                                        <option value="x">X</option>
+                                        <option value="y">Y</option>
+                                        <option value="z">Z</option>
+                                    </select>
+                                </div>
+                                <div style="flex: 0 0 auto;">
+                                    <label
+                                        style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--charcoal); font-weight: 600; cursor: pointer;">
+                                        <input type="checkbox" id="browser-sort-alpha" style="cursor: pointer;">
+                                        <span>Sort Alphabetically</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin: 12px 0; display: flex; gap: 8px;">
+                            <button class="btn btn-secondary" onclick="browseWords('single')">Browse Single
+                                Words</button>
+                            <button class="btn btn-secondary" onclick="browseWords('combo')">Browse
+                                Combinations</button>
+                            <button class="btn btn-secondary btn-small" onclick="applyBrowserFilters()"
+                                style="padding: 6px 12px;">Apply Filters</button>
+                            <button class="btn btn-secondary btn-small" onclick="hideBrowserResults()"
+                                style="padding: 6px 12px;">Hide Results</button>
+                        </div>
+                        <div id="browser-results" class="suggestions-list" style="display: none;"></div>
+                    </div>
+                </section>
+
+                <div id="export-modal" class="export-modal" style="display: none;">
+                    <div class="export-content">
+                        <h2 style="font-size: 24px; margin-bottom: 16px; color: var(--charcoal);">Puzzle JSON</h2>
+                        <textarea id="export-json-content" readonly
+                            style="width: 100%; height: 300px; margin-bottom: 16px; padding: 12px; font-family: monospace; font-size: 14px; border: 3px solid var(--persian-green); border-radius: 12px; resize: none;"></textarea>
+                        <div style="display: flex; gap: 12px; justify-content: flex-end; align-items: center;">
+                            <span id="export-copy-status"
+                                style="color: var(--persian-green); font-weight: 600; font-size: 14px;"></span>
+                            <button class="btn btn-secondary" onclick="copyExportJSON()">Copy to Clipboard</button>
+                            <button class="btn btn-primary" onclick="downloadExportJSON()">Download JSON</button>
+                            <button class="btn btn-secondary" onclick="closeExportModal()"
+                                style="border-color: #666; color: #666; box-shadow: 0 4px 0 #444;">Close</button>
+                        </div>
+                    </div>
                 </div>
-            </section>
-            <div id="export-modal" class="export-modal" style="display: none;">
-                <div class="export-content">
-                    <h2 style="font-size: 24px; margin-bottom: 16px; color: var(--charcoal);">Puzzle JSON</h2>
-                    <textarea id="export-json-content" readonly
-                        style="width: 100%; height: 300px; margin-bottom: 16px; padding: 12px; font-family: monospace; font-size: 14px; border: 3px solid var(--persian-green); border-radius: 12px; resize: none;"></textarea>
-                    <div style="display: flex; gap: 12px; justify-content: flex-end; align-items: center;">
-                        <span id="export-copy-status"
-                            style="color: var(--persian-green); font-weight: 600; font-size: 14px;"></span>
-                        <button class="btn btn-secondary" onclick="copyExportJSON()">Copy to Clipboard</button>
-                        <button class="btn btn-primary" onclick="downloadExportJSON()">Download JSON</button>
-                        <button class="btn btn-secondary" onclick="closeExportModal()"
-                            style="border-color: #666; color: #666; box-shadow: 0 4px 0 #444;">Close</button>
+
+                <div id="import-modal" class="export-modal" style="display: none;">
+                    <div class="export-content">
+                        <h2 style="font-size: 24px; margin-bottom: 16px; color: var(--charcoal);">Import Puzzle JSON
+                        </h2>
+                        <input type="file" id="import-file" accept=".json" onchange="handleFileUpload(event)"
+                            style="margin-bottom: 12px;" />
+                        <textarea id="import-json-content" placeholder="Or paste JSON here..."
+                            style="width: 100%; height: 300px; margin-bottom: 16px; padding: 12px; font-family: monospace; font-size: 14px; border: 3px solid var(--persian-green); border-radius: 12px; resize: none;"></textarea>
+                        <div style="display: flex; gap: 12px; justify-content: flex-end; align-items: center;">
+                            <button class="btn btn-primary" onclick="importJSON()">Import</button>
+                            <button class="btn btn-secondary" onclick="closeImportModal()"
+                                style="border-color: #666; color: #666; box-shadow: 0 4px 0 #444;">Cancel</button>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div id="import-modal" class="export-modal" style="display: none;">
-                <div class="export-content">
-                    <h2 style="font-size: 24px; margin-bottom: 16px; color: var(--charcoal);">Import Puzzle JSON</h2>
-                    <input type="file" id="import-file" accept=".json" onchange="handleFileUpload(event)"
-                        style="margin-bottom: 12px;" />
-                    <textarea id="import-json-content" placeholder="Or paste JSON here..."
-                        style="width: 100%; height: 300px; margin-bottom: 16px; padding: 12px; font-family: monospace; font-size: 14px; border: 3px solid var(--persian-green); border-radius: 12px; resize: none;"></textarea>
-                    <div style="display: flex; gap: 12px; justify-content: flex-end; align-items: center;">
-                        <button class="btn btn-primary" onclick="importJSON()">Import</button>
-                        <button class="btn btn-secondary" onclick="closeImportModal()"
-                            style="border-color: #666; color: #666; box-shadow: 0 4px 0 #444;">Cancel</button>
+            <!-- ==================== TAB 2: WORD FINDER ==================== -->
+            <div id="tab-word-finder" class="tab-content">
+                <section>
+                    <h2 style="margin: 0 0 8px 0;">Word Finder</h2>
+                    <p style="color: #666; font-size: 14px; margin-bottom: 20px;">
+                        Enter letters or words, then find all dictionary words that can be made from those letters.
+                    </p>
+
+                    <div class="word-finder-input-group">
+                        <input type="text" id="word-finder-input" placeholder="Enter letters (e.g. catdog)"
+                            onkeypress="wordFinderHandleKeypress(event)">
+                        <button class="btn btn-primary" onclick="wordFinderSearch()">Search</button>
                     </div>
-                </div>
+
+                    <div id="word-finder-summary" class="word-finder-letter-summary" style="display: none;"></div>
+
+                    <div class="word-finder-filters">
+                        <div>
+                            <label>Min Length:</label>
+                            <input type="number" id="wf-min-length" value="2" min="1" max="20" style="width: 70px;">
+                        </div>
+                        <div>
+                            <label>Max Length:</label>
+                            <input type="number" id="wf-max-length" value="20" min="1" max="20" style="width: 70px;">
+                        </div>
+                        <div>
+                            <label>First Letter:</label>
+                            <select id="wf-first-letter" style="width: 80px;">
+                                <option value="">All</option>
+                                <option value="a">A</option>
+                                <option value="b">B</option>
+                                <option value="c">C</option>
+                                <option value="d">D</option>
+                                <option value="e">E</option>
+                                <option value="f">F</option>
+                                <option value="g">G</option>
+                                <option value="h">H</option>
+                                <option value="i">I</option>
+                                <option value="j">J</option>
+                                <option value="k">K</option>
+                                <option value="l">L</option>
+                                <option value="m">M</option>
+                                <option value="n">N</option>
+                                <option value="o">O</option>
+                                <option value="p">P</option>
+                                <option value="q">Q</option>
+                                <option value="r">R</option>
+                                <option value="s">S</option>
+                                <option value="t">T</option>
+                                <option value="u">U</option>
+                                <option value="v">V</option>
+                                <option value="w">W</option>
+                                <option value="x">X</option>
+                                <option value="y">Y</option>
+                                <option value="z">Z</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label
+                                style="display: flex; align-items: center; gap: 6px; cursor: pointer; margin-bottom: 0;">
+                                <input type="checkbox" id="wf-sort-alpha" style="cursor: pointer;">
+                                <span>A→Z</span>
+                            </label>
+                        </div>
+                        <div>
+                            <label
+                                style="display: flex; align-items: center; gap: 6px; cursor: pointer; margin-bottom: 0;">
+                                <input type="checkbox" id="wf-exact-match" style="cursor: pointer;">
+                                <span>Exact Anagrams Only</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="word-finder-results">
+                        <p style="padding: 12px; color: #999;">Enter some letters above to find words.</p>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ==================== TAB 3: SLOT PUZZLE ==================== -->
+            <div id="tab-slot-puzzle" class="tab-content">
+                <section>
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div>
+                            <h2 style="margin: 0;">Slot Puzzle Builder</h2>
+                            <p style="color: #666; font-size: 14px; margin-top: 4px;">Build a slot-type puzzle with
+                                source words, extra letters, and target words.</p>
+                        </div>
+                        <a href="slot-puzzle.html" class="btn btn-secondary"
+                            style="text-decoration: none; font-size: 13px;">
+                            Play Game →
+                        </a>
+                    </div>
+
+                    <!-- Source Words -->
+                    <div
+                        style="margin-bottom: 24px; padding: 16px; background: #fdfdfd; border: 2px solid #e0e0e0; border-radius: 12px;">
+                        <h3 style="margin: 0 0 12px 0; color: var(--charcoal); font-size: 16px;">Source Words</h3>
+                        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                            <input type="text" id="new-source-word-input" placeholder="Enter a source word..."
+                                style="flex: 1; padding: 8px 12px; font-size: 14px; border: 3px solid var(--persian-green); border-radius: 12px; font-weight: 600;"
+                                onkeypress="slotHandleSourceWordKeypress(event)">
+                            <button class="btn btn-primary" onclick="slotAddSourceWord()">Add</button>
+                        </div>
+                        <div id="source-words-list"></div>
+                    </div>
+
+                    <!-- Extra Letters -->
+                    <div
+                        style="margin-bottom: 24px; padding: 16px; background: #fdfdfd; border: 2px solid #e0e0e0; border-radius: 12px;">
+                        <h3 style="margin: 0 0 12px 0; color: var(--charcoal); font-size: 16px;">Extra Letters</h3>
+                        <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 12px;">
+                            <div>
+                                <label style="font-size: 12px; color: var(--charcoal); font-weight: 600;">Letter
+                                    1:</label>
+                                <input type="text" id="extra-letter-1-input" maxlength="1" placeholder="?"
+                                    style="width: 50px; padding: 8px; font-size: 18px; font-weight: 700; text-align: center; text-transform: uppercase; border: 3px solid #ffc107; border-radius: 12px;"
+                                    oninput="updateExtraLetter1()">
+                            </div>
+                            <div>
+                                <label style="font-size: 12px; color: var(--charcoal); font-weight: 600;">Letter
+                                    2:</label>
+                                <input type="text" id="extra-letter-2-input" maxlength="1" placeholder="?"
+                                    style="width: 50px; padding: 8px; font-size: 18px; font-weight: 700; text-align: center; text-transform: uppercase; border: 3px solid #ffc107; border-radius: 12px;"
+                                    oninput="updateExtraLetter2()">
+                            </div>
+                            <div id="extra-letters-display" style="display: flex; gap: 4px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Letter Pool Preview -->
+                    <div
+                        style="margin-bottom: 24px; padding: 16px; background: #fdfdfd; border: 2px solid #e0e0e0; border-radius: 12px;">
+                        <h3 style="margin: 0 0 12px 0; color: var(--charcoal); font-size: 16px;">Letter Pool</h3>
+                        <div id="letter-pool-display" class="letters" style="margin-bottom: 8px;"></div>
+                        <div id="letter-pool-stats" style="font-size: 12px; color: #666;"></div>
+                    </div>
+
+                    <!-- Target Words -->
+                    <div
+                        style="margin-bottom: 24px; padding: 16px; background: #fdfdfd; border: 2px solid #e0e0e0; border-radius: 12px;">
+                        <h3 style="margin: 0 0 12px 0; color: var(--charcoal); font-size: 16px;">Target Words</h3>
+                        <div id="target-words-list"></div>
+                    </div>
+
+                    <!-- Summary -->
+                    <div id="slot-puzzle-summary" class="summary-panel" style="display: none;">
+                        <h3>Slot Puzzle Summary</h3>
+                        <div id="slot-summary-content"></div>
+                    </div>
+                </section>
             </div>
         </main>
     </div>
 
     <script src="words.js"></script>
     <script src="app.js"></script>
+    <script src="slot-puzzle.js"></script>
+    <script src="word-finder.js"></script>
+    <script>
+        // Tab switching logic
+        let slotPuzzleInitialized = false;
+
+        function switchTab(tabId) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            // Deactivate all tab buttons
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+            // Show selected tab
+            const tabEl = document.getElementById('tab-' + tabId);
+            if (tabEl) tabEl.classList.add('active');
+
+            // Activate the correct button
+            const buttons = document.querySelectorAll('.tab-btn');
+            const tabNames = ['puzzle-builder', 'word-finder', 'slot-puzzle'];
+            const idx = tabNames.indexOf(tabId);
+            if (idx >= 0 && buttons[idx]) buttons[idx].classList.add('active');
+
+            // Lazy-init slot puzzle on first visit
+            if (tabId === 'slot-puzzle' && !slotPuzzleInitialized) {
+                slotPuzzleInitialized = true;
+                initSlotPuzzle();
+            }
+
+            // Lazy-init word finder on first visit
+            if (tabId === 'word-finder') {
+                initWordFinder();
+            }
+        }
+    </script>
 </body>
 
 </html>
