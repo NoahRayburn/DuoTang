@@ -73,8 +73,11 @@ function wordFinderSearch() {
         if (sortAlpha) {
             results.sort();
         } else {
-            // Sort by length descending (longest words first)
-            results.sort((a, b) => b.length - a.length || a.localeCompare(b));
+            // Shuffle results (Fisher-Yates) so you don't always see the same words
+            for (let i = results.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [results[i], results[j]] = [results[j], results[i]];
+            }
         }
 
         wordFinderState.currentResults = results;
@@ -135,6 +138,17 @@ function wordFinderRenderResults() {
 }
 
 function wordFinderLoadMore() {
+    wordFinderRenderResults();
+}
+
+function wordFinderShuffle() {
+    if (wordFinderState.currentResults.length === 0) return;
+    const arr = wordFinderState.currentResults;
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    wordFinderState.resultsShown = 0;
     wordFinderRenderResults();
 }
 

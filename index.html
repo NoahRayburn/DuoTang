@@ -20,6 +20,7 @@
             <button class="tab-btn active" onclick="switchTab('puzzle-builder')">Puzzle Builder</button>
             <button class="tab-btn" onclick="switchTab('word-finder')">Word Finder</button>
             <button class="tab-btn" onclick="switchTab('slot-puzzle')">Slot Puzzle</button>
+            <button class="tab-btn" onclick="switchTab('settings')" style="margin-left: auto;">⚙️</button>
         </div>
 
         <main>
@@ -64,17 +65,7 @@
                                 from
                                 all suggestions</div>
                         </div>
-                        <div style="max-width: 600px;">
-                            <label
-                                style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--charcoal); font-weight: 600; cursor: pointer;">
-                                <input type="checkbox" id="use-expanded-wordlist" onchange="toggleWordList()"
-                                    style="cursor: pointer;">
-                                <span>Use Expanded Word List (~6,800 words)</span>
-                            </label>
-                            <div style="font-size: 11px; color: #666; margin-top: 4px; margin-left: 24px;">Includes
-                                abstract
-                                nouns and less common words. Default uses filtered list (~5,600 concrete nouns).</div>
-                        </div>
+
                     </div>
 
                     <div id="intro-dialogue-container"
@@ -189,13 +180,15 @@
                             </div>
                         </div>
 
-                        <div style="margin: 12px 0; display: flex; gap: 8px;">
+                        <div style="margin: 12px 0; display: flex; gap: 8px; flex-wrap: wrap;">
                             <button class="btn btn-secondary" onclick="browseWords('single')">Browse Single
                                 Words</button>
                             <button class="btn btn-secondary" onclick="browseWords('combo')">Browse
                                 Combinations</button>
                             <button class="btn btn-secondary btn-small" onclick="applyBrowserFilters()"
                                 style="padding: 6px 12px;">Apply Filters</button>
+                            <button class="btn btn-secondary btn-small" onclick="shuffleBrowserResults()"
+                                style="padding: 6px 12px;">🔀 Shuffle</button>
                             <button class="btn btn-secondary btn-small" onclick="hideBrowserResults()"
                                 style="padding: 6px 12px;">Hide Results</button>
                         </div>
@@ -307,6 +300,10 @@
                                 <span>Exact Anagrams Only</span>
                             </label>
                         </div>
+                        <div>
+                            <button class="btn btn-secondary btn-small" onclick="wordFinderShuffle()"
+                                style="padding: 6px 12px; font-size: 11px;">🔀 Shuffle</button>
+                        </div>
                     </div>
 
                     <div id="word-finder-results">
@@ -389,6 +386,29 @@
                     </div>
                 </section>
             </div>
+
+            <!-- ==================== TAB 4: SETTINGS ==================== -->
+            <div id="tab-settings" class="tab-content">
+                <section>
+                    <h2 style="margin: 0 0 8px 0;">Settings</h2>
+                    <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Global settings that apply to all
+                        tabs.</p>
+
+                    <div
+                        style="padding: 16px; background: #fdfdfd; border: 2px solid #e0e0e0; border-radius: 12px; margin-bottom: 16px;">
+                        <h3 style="margin: 0 0 12px 0; color: var(--charcoal); font-size: 16px;">Word List</h3>
+                        <label
+                            style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--charcoal); font-weight: 600; cursor: pointer;">
+                            <input type="checkbox" id="use-expanded-wordlist" checked onchange="toggleWordList()"
+                                style="cursor: pointer; width: 18px; height: 18px;">
+                            <span>Use Expanded Word List (~6,800 words)</span>
+                        </label>
+                        <div style="font-size: 12px; color: #666; margin-top: 8px; margin-left: 26px;">Includes abstract
+                            nouns and less common words. When unchecked, uses filtered list (~5,600 concrete nouns).
+                        </div>
+                    </div>
+                </section>
+            </div>
         </main>
     </div>
 
@@ -412,7 +432,7 @@
 
             // Activate the correct button
             const buttons = document.querySelectorAll('.tab-btn');
-            const tabNames = ['puzzle-builder', 'word-finder', 'slot-puzzle'];
+            const tabNames = ['puzzle-builder', 'word-finder', 'slot-puzzle', 'settings'];
             const idx = tabNames.indexOf(tabId);
             if (idx >= 0 && buttons[idx]) buttons[idx].classList.add('active');
 

@@ -844,6 +844,7 @@ function createStageElement(stage, index) {
                                 <input type="checkbox" id="sort-toggle-${index}" checked onchange="toggleSort(${index})" style="cursor: pointer;">
                                 <span>Sort by Best Match</span>
                             </label>
+                            <button class="btn btn-secondary btn-small" onclick="shuffleSuggestions(${index})" style="padding: 4px 8px; font-size: 11px;">🔀 Shuffle</button>
                             <button class="btn btn-secondary btn-small" onclick="hideSuggestions(${index})" style="padding: 4px 8px; font-size: 11px;">Hide</button>
                         </div>
                     </div>
@@ -1669,6 +1670,19 @@ function toggleSort(stageIndex) {
     applyFilters(stageIndex);
 }
 
+function shuffleSuggestions(stageIndex) {
+    const stage = stages[stageIndex];
+    if (!stage.currentCombinations || stage.currentCombinations.length === 0) return;
+    // Fisher-Yates shuffle
+    const arr = stage.currentCombinations;
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    stage.combinationsShown = 0;
+    renderSuggestions(stageIndex, stage.currentMode);
+}
+
 function toggleIncomplete(stageIndex) {
     // Only refresh if suggestions are currently visible
     const stage = stages[stageIndex];
@@ -2348,6 +2362,17 @@ function loadMoreBrowserResults(mode) {
 
 function hideBrowserResults() {
     document.getElementById('browser-results').style.display = 'none';
+}
+
+function shuffleBrowserResults() {
+    if (wordBrowserState.currentResults.length === 0) return;
+    const arr = wordBrowserState.currentResults;
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    wordBrowserState.resultsShown = 0;
+    renderBrowserResults(wordBrowserState.currentMode);
 }
 
 // Target Word Suggestion Functions
