@@ -20,6 +20,7 @@
             <button class="tab-btn active" onclick="switchTab('puzzle-builder')">Puzzle Builder</button>
             <button class="tab-btn" onclick="switchTab('word-finder')">Word Finder</button>
             <button class="tab-btn" onclick="switchTab('slot-puzzle')">Slot Puzzle</button>
+            <button class="tab-btn" onclick="switchTab('list-checker')">List Checker</button>
             <button class="tab-btn" onclick="switchTab('settings')" style="margin-left: auto;">⚙️</button>
         </div>
 
@@ -387,7 +388,36 @@
                 </section>
             </div>
 
-            <!-- ==================== TAB 4: SETTINGS ==================== -->
+            <!-- ==================== TAB 4: LIST CHECKER ==================== -->
+            <div id="tab-list-checker" class="tab-content">
+                <section>
+                    <h2 style="margin: 0 0 8px 0;">List Checker</h2>
+                    <p style="color: #666; font-size: 14px; margin-bottom: 20px;">
+                        Enter a set of letters and one or more word lists. For each list, see which words can be made from the letters and the count.
+                    </p>
+
+                    <div class="word-finder-input-group">
+                        <input type="text" id="list-checker-letters" placeholder="Enter letters (e.g. catdog)"
+                            oninput="listCheckerOnLettersInput()">
+                    </div>
+
+                    <div id="list-checker-letter-summary" class="word-finder-letter-summary" style="display: none;">
+                    </div>
+
+                    <div id="list-checker-overall" class="list-checker-overall" style="display: none;"></div>
+
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <h3 style="margin: 0; color: var(--charcoal); font-size: 16px;">Word Lists</h3>
+                        <button class="btn btn-secondary" onclick="listCheckerAddList()"
+                            style="font-size: 13px; padding: 6px 14px;">+ Add List</button>
+                    </div>
+
+                    <div id="list-checker-lists"></div>
+                </section>
+            </div>
+
+            <!-- ==================== TAB 5: SETTINGS ==================== -->
             <div id="tab-settings" class="tab-content">
                 <section>
                     <h2 style="margin: 0 0 8px 0;">Settings</h2>
@@ -416,6 +446,7 @@
     <script src="app.js"></script>
     <script src="slot-puzzle.js"></script>
     <script src="word-finder.js"></script>
+    <script src="list-checker.js"></script>
     <script>
         // Tab switching logic
         let slotPuzzleInitialized = false;
@@ -432,7 +463,7 @@
 
             // Activate the correct button
             const buttons = document.querySelectorAll('.tab-btn');
-            const tabNames = ['puzzle-builder', 'word-finder', 'slot-puzzle', 'settings'];
+            const tabNames = ['puzzle-builder', 'word-finder', 'slot-puzzle', 'list-checker', 'settings'];
             const idx = tabNames.indexOf(tabId);
             if (idx >= 0 && buttons[idx]) buttons[idx].classList.add('active');
 
@@ -445,6 +476,11 @@
             // Lazy-init word finder on first visit
             if (tabId === 'word-finder') {
                 initWordFinder();
+            }
+
+            // Lazy-init list checker on first visit
+            if (tabId === 'list-checker') {
+                initListChecker();
             }
         }
     </script>
