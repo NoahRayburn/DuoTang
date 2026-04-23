@@ -710,6 +710,40 @@ main {
     border-radius: 14px;
 }
 
+.list-checker-suggest {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed #d0d0d0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+.list-checker-suggest-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--charcoal);
+    margin-right: 4px;
+}
+
+.list-checker-suggest-chip {
+    display: inline-block;
+    padding: 4px 10px;
+    background: var(--sandy-brown);
+    color: white;
+    font-size: 13px;
+    font-weight: 700;
+    border-radius: 16px;
+    letter-spacing: 0.5px;
+}
+
+.list-checker-suggest-count {
+    font-weight: 500;
+    font-size: 11px;
+    opacity: 0.9;
+}
+
 /* Mobile Responsive Styles */
 @media screen and (max-width: 768px) {
     body {

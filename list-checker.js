@@ -117,6 +117,17 @@ function listCheckerUpdateResults(id) {
 
     const matches = words.filter(w => canMakeWord(w, letters));
     const pct = words.length > 0 ? Math.round((matches.length / words.length) * 100) : 0;
+    const unreachable = words.filter(w => !canMakeWord(w, letters));
+    const topLetters = listCheckerTopLettersToAdd(unreachable, letters);
+
+    const suggestHtml = topLetters.length === 0
+        ? (unreachable.length === 0
+            ? ''
+            : '<div class="list-checker-suggest"><span class="list-checker-suggest-label">Add a letter:</span> <span class="list-checker-empty">no single letter unlocks more words</span></div>')
+        : `<div class="list-checker-suggest">
+                <span class="list-checker-suggest-label">Add a letter:</span>
+                ${topLetters.map(([l, n]) => `<span class="list-checker-suggest-chip">+${l.toUpperCase()} <span class="list-checker-suggest-count">(+${n})</span></span>`).join('')}
+            </div>`;
 
     div.innerHTML = `
         <div class="list-checker-count">
@@ -127,7 +138,25 @@ function listCheckerUpdateResults(id) {
                 ? '<span class="list-checker-empty">No words from this list can be made.</span>'
                 : matches.map(w => `<span class="list-checker-chip">${lcEscapeHtml(w)}</span>`).join('')}
         </div>
+        ${suggestHtml}
     `;
+}
+
+function listCheckerTopLettersToAdd(unreachable, letters) {
+    if (unreachable.length === 0) return [];
+    const counts = {};
+    for (let i = 0; i < 26; i++) {
+        const letter = String.fromCharCode(97 + i);
+        const expanded = letters + letter;
+        let n = 0;
+        for (const w of unreachable) {
+            if (canMakeWord(w, expanded)) n++;
+        }
+        if (n > 0) counts[letter] = n;
+    }
+    return Object.entries(counts)
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .slice(0, 3);
 }
 
 function listCheckerUpdateOverallSummary() {
