@@ -1355,12 +1355,20 @@ async function showSuggestions(stageIndex, mode = 'single') {
     const suggestionsDiv = document.getElementById(`suggestions-${stageIndex}`);
     const listDiv = document.getElementById(`suggestions-list-${stageIndex}`);
 
+    // Assign a unique run id so late writes from superseded searches can
+    // detect they are stale and bail out (see toggleWordList()).
+    showSuggestions._nextId = (showSuggestions._nextId || 0) + 1;
+    const myRunId = showSuggestions._nextId;
+    stage.activeRunId = myRunId;
+
     suggestionsDiv.style.display = 'block';
     const searchText = mode === 'single' ? 'Searching for single words...' : 'Searching for combinations...';
     listDiv.innerHTML = `<p style="padding: 12px; color: #666;">${searchText} (this may take a moment)</p>`;
 
     // Use setTimeout to allow UI to update
     setTimeout(async () => {
+        // Bail if a newer search (or toggleWordList) has superseded us.
+        if (stage.activeRunId !== myRunId) return;
         // Get available letters from previous stage (if not first stage)
         const availableLetters = stage.letterPool || '';
 
@@ -1408,6 +1416,8 @@ async function showSuggestions(stageIndex, mode = 'single') {
 
         // Progress callback to render results as they're found
         const progressCallback = (currentCombinations) => {
+            // Discard writes from a superseded search (stale gen).
+            if (stage.activeRunId !== myRunId) return;
             if (currentCombinations.length === 0) return;
 
             if (throttleProgress) {
@@ -1482,6 +1492,10 @@ async function showSuggestions(stageIndex, mode = 'single') {
             0,
             { futureLetters: futureLettersForSearch, mode }
         );
+
+        // If a newer run superseded us while we were awaiting, bail out —
+        // do NOT overwrite the newer run's results.
+        if (stage.activeRunId !== myRunId) return;
 
         stage.searchInProgress = false;
 
@@ -1587,6 +1601,24 @@ function renderSuggestions(stageIndex, mode) {
             headerText = 'Suggested word combinations:';
         }
     }
+
+    // Append the active word-list name so users can see at a glance which
+    // list produced these results. This is visible confirmation that the
+    // Settings → Word List toggle is actually taking effect — filters like
+    // "no excess" can coincidentally produce the same *count* across lists
+    // even when the underlying words differ.
+    let activeListName = 'Expanded';
+    let activeListSize = (typeof WORD_LIST_EXPANDED !== 'undefined' ? WORD_LIST_EXPANDED.length : 0);
+    if (typeof currentWordList !== 'undefined') {
+        if (typeof WORD_LIST_CONCRETE !== 'undefined' && currentWordList === WORD_LIST_CONCRETE) {
+            activeListName = 'Concrete';
+            activeListSize = WORD_LIST_CONCRETE.length;
+        } else if (typeof WORD_LIST !== 'undefined' && currentWordList === WORD_LIST) {
+            activeListName = 'Filtered';
+            activeListSize = WORD_LIST.length;
+        }
+    }
+    headerText += ` <span style="font-weight: 400; color: #888;">(${activeListName} list · ${activeListSize.toLocaleString()} words)</span>`;
 
     // Helper function to highlight letters by relevance
     const highlightWord = (word) => {
@@ -2524,39 +2556,55 @@ function clearSourceWords() {
 }
 
 function toggleWordList() {
-    const checkbox = document.getElementById('use-expanded-wordlist');
-    const useExpanded = checkbox.checked;
+    // Read the selected radio option; default to 'expanded' if nothing
+    // is checked (shouldn't happen but stay defensive).
+    const selected = document.querySelector('input[name="wordlist-choice"]:checked');
+    const listName = selected ? selected.value : 'expanded';
 
-    // Switch to expanded or filtered word list
-    useExpandedWordList(useExpanded);
+    // Switch the active word list in words.js.
+    if (typeof setWordList === 'function') {
+        setWordList(listName);
+    } else {
+        // Back-compat for older words.js builds that only expose the boolean API.
+        useExpandedWordList(listName === 'expanded');
+    }
 
-    // Refresh all visible suggestions
+    // Invalidate cached results AND abort any in-flight searches on EVERY
+    // stage. Setting activeRunId to a unique sentinel causes the original
+    // search's late writes (progress callback + final write) to be discarded,
+    // eliminating the race where a stale search overwrites new results.
     stages.forEach((stage, index) => {
+        stage.activeRunId = -1;
+        stage.searchInProgress = false;
+        stage.sortedCombinations = null;
+        stage.unsortedCombinations = null;
+        stage.currentCombinations = null;
+        stage.combinationsShown = 0;
+
+        // Re-run the search for any stage whose suggestions panel is open.
+        // showSuggestions assigns its own fresh activeRunId, so subsequent
+        // writes from THIS call will succeed.
         const suggestionsDiv = document.getElementById(`suggestions-${index}`);
-
-        // If suggestions are currently visible, refresh them
-        if (suggestionsDiv && suggestionsDiv.style.display !== 'none') {
-            // Clear cached combinations since word list changed
-            stage.sortedCombinations = null;
-            stage.unsortedCombinations = null;
-            stage.currentCombinations = null;
-            stage.combinationsShown = 0;
-
-            // Re-trigger the search with current mode
-            if (stage.currentMode) {
-                if (stage.currentMode === 'single') {
-                    showSuggestions(index, 'single');
-                } else if (stage.currentMode === 'combo') {
-                    showSuggestions(index, 'combo');
-                }
-            }
+        if (suggestionsDiv && suggestionsDiv.style.display !== 'none' && stage.currentMode && stage.targetWord) {
+            showSuggestions(index, stage.currentMode);
         }
     });
 
-    // Show notification
-    const wordCount = useExpanded ? '~6,800' : '~5,600';
-    const listType = useExpanded ? 'expanded' : 'filtered';
-    console.log(`Switched to ${listType} word list (${wordCount} words)`);
+    // Word Finder caches its last results. If the Word Finder tab is active
+    // and has results on screen, re-run its search with the new list.
+    if (typeof wordFinderState !== 'undefined' && wordFinderState.inputLetters) {
+        const wfTab = document.getElementById('tab-word-finder');
+        if (wfTab && wfTab.classList.contains('active') && typeof wordFinderSearch === 'function') {
+            wordFinderSearch();
+        } else {
+            // Clear its cache so the next visit re-queries cleanly.
+            wordFinderState.currentResults = [];
+            wordFinderState.resultsShown = 0;
+        }
+    }
+
+    const sizes = { expanded: '~6,800', filtered: '~5,600', concrete: '~11,200' };
+    console.log(`Switched to ${listName} word list (${sizes[listName] || '?'} words)`);
 }
 
 
