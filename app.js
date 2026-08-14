@@ -11,9 +11,13 @@ function sortString(str) {
 }
 
 function getLetterCounts(str) {
+    // Count a-z only: hyphens/spaces in dictionary entries ("e-mail") and
+    // stray characters in typed input must never enter the letter economy.
     const counts = {};
     for (const char of str.toLowerCase()) {
-        counts[char] = (counts[char] || 0) + 1;
+        if (char >= 'a' && char <= 'z') {
+            counts[char] = (counts[char] || 0) + 1;
+        }
     }
     return counts;
 }
@@ -122,13 +126,17 @@ function subtractLetters(pool, word) {
     const poolCounts = getLetterCounts(pool);
     const wordCounts = getLetterCounts(word);
 
+    // Clamp at zero: a deficit must never produce a negative count
+    // (letter.repeat(negative) throws RangeError).
     for (const [letter, count] of Object.entries(wordCounts)) {
-        poolCounts[letter] -= count;
+        if (poolCounts[letter]) {
+            poolCounts[letter] = Math.max(0, poolCounts[letter] - count);
+        }
     }
 
     let result = '';
-    for (const [letter, count] of Object.entries(poolCounts)) {
-        result += letter.repeat(count);
+    for (const letter of Object.keys(poolCounts).sort()) {
+        result += letter.repeat(poolCounts[letter]);
     }
     return result;
 }
@@ -194,6 +202,10 @@ async function findWordCombinations(targetWord, availableLetters = '', minWords 
     const allowMissing = includeIncomplete || maxMissingLetters > 0;
     const searchMode = options.mode || 'single';
     const isCombinationMode = searchMode === 'combo';
+    // Hard cap on collected results. Without it, allowMissing pair
+    // enumeration can push millions of "missing ≤ N letters" pairs (the
+    // auto-solver hit this and appeared to hang for minutes per stage).
+    const maxResults = options.maxResults || Infinity;
 
     // If we have available letters from previous stage, check if they alone can make the target
     if (availableLetters && canMakeWord(targetWord, availableLetters)) {
@@ -391,6 +403,7 @@ async function findWordCombinations(targetWord, availableLetters = '', minWords 
     // Find single words that, combined with available letters, make the target
     if (minWords <= 1) {
         for (const word of shuffled) {
+            if (combinations.length >= maxResults) break;
             const combined = availableLetters + word;
             const combinedCounts = getLetterCountsArray(combined);
             const { missingTotal } = getMissingLetterInfo(targetCountsArrayFull, combinedCounts);
@@ -439,6 +452,7 @@ async function findWordCombinations(targetWord, availableLetters = '', minWords 
         }
 
         for (let i = 0; i < wordData.length; i++) {
+            if (combinations.length >= maxResults) break;
             const data1 = wordData[i];
 
             // Calculate what letters word1 + available letters provide
@@ -469,6 +483,7 @@ async function findWordCombinations(targetWord, availableLetters = '', minWords 
 
             // OPTIMIZATION: j=i+1 instead of j=0 (50% reduction - only check each pair once)
             for (let j = i + 1; j < wordData.length; j++) {
+                if (combinations.length >= maxResults) break;
                 // Only check candidates that provide needed letters
                 if (!candidateIndices.has(j)) continue;
 
@@ -547,26 +562,63 @@ async function findWordCombinations(targetWord, availableLetters = '', minWords 
     return combinations;
 }
 
+// Escape a string for interpolation into HTML text or attribute values
+function escHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 // Stage Management
-function addStage() {
-    const newStage = {
+function createEmptyStage(isFirst) {
+    return {
         targetWord: '',
         sourceWords: [],
         letterPool: '',
         remainingLetters: '',
         complete: false,
-        isFirst: stages.length === 0,
+        isFirst: !!isFirst,
         randomLetters: '',
-        dialogue: ''
+        dialogue: '',
+        suggestionsOpen: false,
+        filters: null
     };
+}
 
-    // Set letter pool from previous stage if it exists and is complete
-    if (stages.length > 0 && stages[stages.length - 1].complete) {
-        newStage.letterPool = stages[stages.length - 1].remainingLetters;
+// Per-stage suggestion filter toggles survive re-renders and searches
+function getStageFilters(stage) {
+    if (!stage.filters) {
+        stage.filters = { incomplete: true, exactMatch: false, noExcess: true, sort: true };
     }
+    return stage.filters;
+}
 
-    stages.push(newStage);
+// Poison a stage's in-flight searches and drop its cached suggestion
+// results. Any pending progress/final write from an old search sees the
+// changed activeRunId and bails instead of resurrecting stale results.
+function invalidateStageSuggestions(stage) {
+    stage.activeRunId = -1;
+    stage.searchInProgress = false;
+    stage.sortedCombinations = null;
+    stage.unsortedCombinations = null;
+    stage.currentCombinations = null;
+    stage.combinationsShown = 0;
+    stage.suggestionsOpen = false;
+    stage.currentMode = null;
+}
+
+function invalidateAllStageSuggestions() {
+    stages.forEach(invalidateStageSuggestions);
+}
+
+function addStage() {
+    stages.push(createEmptyStage(stages.length === 0));
     targetWords = stages.map(s => s.targetWord);
+    // Derive the new stage's letterPool (and everything else) from the chain
+    recalculateStageChain();
     renderPuzzleBuilder();
 }
 
@@ -578,20 +630,16 @@ function removeStage(index) {
     stages.splice(index, 1);
 
     // Update isFirst property
-    if (stages.length > 0) {
-        stages[0].isFirst = true;
-    }
+    stages.forEach((stage, i) => { stage.isFirst = i === 0; });
 
-    // Recalculate letter pools for remaining stages
-    for (let i = 1; i < stages.length; i++) {
-        const prevStage = stages[i - 1];
-        if (prevStage.complete) {
-            stages[i].letterPool = sortString(prevStage.remainingLetters + (stages[i].randomLetters || ''));
-        } else {
-            stages[i].letterPool = sortString(stages[i].randomLetters || '');
-            stages[i].complete = false;
-        }
-    }
+    // Stage indices shifted: cached suggestions and in-flight searches
+    // reference the old layout, so drop them all.
+    invalidateAllStageSuggestions();
+
+    // Re-derive every stage's letterPool / complete / remainingLetters
+    // from the post-removal chain (the old inline loop kept stale
+    // complete flags and stale remainingLetters on downstream stages).
+    recalculateStageChain();
 
     targetWords = stages.map(s => s.targetWord);
     renderPuzzleBuilder();
@@ -608,44 +656,23 @@ function updateTargetWord(index, value) {
     stages[index].targetWord = newWord;
     targetWords[index] = newWord;
 
-    // Clear completion status when target word changes
-    stages[index].complete = false;
-    stages[index].remainingLetters = '';
-
-    // Clear subsequent stages' completion and letter pools
-    for (let i = index + 1; i < stages.length; i++) {
-        stages[i].complete = false;
-        stages[i].letterPool = sortString(stages[i].randomLetters || '');
-        stages[i].remainingLetters = '';
+    // Cached suggestions for this and downstream stages were computed
+    // against the old target/pools — drop them.
+    for (let i = index; i < stages.length; i++) {
+        invalidateStageSuggestions(stages[i]);
     }
+
+    // Re-validate this stage and cascade recomputation downstream, so a
+    // stage whose pool already satisfies the new target completes
+    // immediately instead of waiting for an unrelated edit.
+    recalculateStageChainFrom(index);
 
     renderPuzzleBuilder();
 }
 
 // Initialize with 2 empty stages
 document.addEventListener('DOMContentLoaded', () => {
-    stages = [
-        {
-            targetWord: '',
-            sourceWords: [],
-            letterPool: '',
-            remainingLetters: '',
-            complete: false,
-            isFirst: true,
-            randomLetters: '',
-            dialogue: ''
-        },
-        {
-            targetWord: '',
-            sourceWords: [],
-            letterPool: '',
-            remainingLetters: '',
-            complete: false,
-            isFirst: false,
-            randomLetters: '',
-            dialogue: ''
-        }
-    ];
+    stages = [createEmptyStage(true), createEmptyStage(false)];
     targetWords = ['', ''];
 
     const firstStageToggle = document.getElementById('allow-first-stage-random');
@@ -683,6 +710,20 @@ function renderPuzzleBuilder() {
 
     // Setup container-level drag and drop
     setupContainerDragDrop(container);
+
+    // The innerHTML wipe above destroyed any open suggestions list —
+    // re-populate open panels from their cached results so a re-render
+    // (adding a word, clicking a missing letter) doesn't lose them.
+    stages.forEach((stage, index) => {
+        if (!stage.suggestionsOpen || !stage.currentMode) return;
+        if (stage.currentCombinations) {
+            stage.combinationsShown = 0;
+            renderSuggestions(index, stage.currentMode);
+        } else if (stage.searchInProgress) {
+            const listDiv = document.getElementById(`suggestions-list-${index}`);
+            if (listDiv) listDiv.innerHTML = '<p style="padding: 12px; color: #666;">Searching... (this may take a moment)</p>';
+        }
+    });
 
     updateSummary();
     updateWordBrowser();
@@ -732,6 +773,7 @@ function createStageElement(stage, index) {
     div.id = `stage-${index}`;
     div.dataset.stageIndex = index;
 
+    const filters = getStageFilters(stage);
     const statusClass = stage.complete ? 'complete' : 'incomplete';
     const statusText = stage.complete ? 'Complete' : 'Incomplete';
     const startingLettersSection = stage.targetWord && stage.isFirst ? buildLetterPoolSection(stage, index, 'Starting letters') : '';
@@ -744,7 +786,7 @@ function createStageElement(stage, index) {
                 type="text"
                 class="target-word-input"
                 id="target-input-${index}"
-                value="${stage.targetWord}"
+                value="${escHtml(stage.targetWord)}"
                 placeholder="Target word ${index + 1}"
                 onblur="updateTargetWord(${index}, this.value)"
                 onkeypress="handleTargetInput(event, ${index})"
@@ -799,10 +841,10 @@ function createStageElement(stage, index) {
             <div>
                 ${stage.sourceWords.length > 0 ? `
                     <div class="selected-source-tags" id="selected-tags-${index}" style="margin-bottom: 8px;">
-                        ${stage.sourceWords.map(w => `
+                        ${stage.sourceWords.map((w, wi) => `
                             <div class="source-tag" style="background: ${currentWordSet.has(w) ? '#667eea' : '#ffc107'}; color: ${currentWordSet.has(w) ? 'white' : '#333'}; padding: 4px 10px; font-size: 13px;">
-                                ${!currentWordSet.has(w) ? '⚠️ ' : ''}${w}
-                                <span class="remove" onclick="removeSourceWord(${index}, '${w}')">&times;</span>
+                                ${!currentWordSet.has(w) ? '⚠️ ' : ''}${escHtml(w)}
+                                <span class="remove" onclick="removeSourceWord(${index}, ${wi})">&times;</span>
                             </div>
                         `).join('')}
                     </div>
@@ -824,24 +866,24 @@ function createStageElement(stage, index) {
                 </div>
                 <div id="source-spell-check-${index}" style="font-size: 11px; margin-bottom: 8px;"></div>
 
-                <div id="suggestions-${index}" class="suggestions" style="display: none; margin-top: 8px;">
+                <div id="suggestions-${index}" class="suggestions" style="display: ${stage.suggestionsOpen ? 'block' : 'none'}; margin-top: 8px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                         <span style="font-size: 12px; font-weight: 600; color: #666;">Suggestions</span>
                         <div style="display: flex; gap: 8px; align-items: center;">
                             <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #666; cursor: pointer;">
-                                <input type="checkbox" id="incomplete-toggle-${index}" onchange="toggleIncomplete(${index})" style="cursor: pointer;">
+                                <input type="checkbox" id="incomplete-toggle-${index}" ${filters.incomplete ? 'checked' : ''} onchange="toggleIncomplete(${index})" style="cursor: pointer;">
                                 <span>Show Incomplete</span>
                             </label>
                             <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #666; cursor: pointer;">
-                                <input type="checkbox" id="exact-match-toggle-${index}" onchange="toggleExactMatch(${index})" style="cursor: pointer;">
+                                <input type="checkbox" id="exact-match-toggle-${index}" ${filters.exactMatch ? 'checked' : ''} onchange="toggleExactMatch(${index})" style="cursor: pointer;">
                                 <span>Exact Matches Only</span>
                             </label>
                             <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #666; cursor: pointer;">
-                                <input type="checkbox" id="no-excess-toggle-${index}" checked onchange="toggleNoExcess(${index})" style="cursor: pointer;">
+                                <input type="checkbox" id="no-excess-toggle-${index}" ${filters.noExcess ? 'checked' : ''} onchange="toggleNoExcess(${index})" style="cursor: pointer;">
                                 <span>No Excess (Red) Letters</span>
                             </label>
                             <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #666; cursor: pointer;">
-                                <input type="checkbox" id="sort-toggle-${index}" checked onchange="toggleSort(${index})" style="cursor: pointer;">
+                                <input type="checkbox" id="sort-toggle-${index}" ${filters.sort ? 'checked' : ''} onchange="toggleSort(${index})" style="cursor: pointer;">
                                 <span>Sort by Best Match</span>
                             </label>
                             <button class="btn btn-secondary btn-small" onclick="shuffleSuggestions(${index})" style="padding: 4px 8px; font-size: 11px;">🔀 Shuffle</button>
@@ -872,7 +914,7 @@ function createStageElement(stage, index) {
                     <input
                         type="text"
                         id="dialogue-input-${index}"
-                        value="${stage.dialogue || ''}"
+                        value="${escHtml(stage.dialogue || '')}"
                         placeholder="Dialogue (optional)"
                         onblur="updateDialogue(${index}, this.value)"
                         onkeypress="handleDialogueInput(event, ${index})"
@@ -1024,8 +1066,14 @@ function setupContainerDragDrop(container) {
                 stages[i].isFirst = false;
             }
 
+            // Stage indices shifted: cached suggestions and in-flight
+            // searches reference the old order, so drop them all.
+            invalidateAllStageSuggestions();
+
             // Fully recalculate the stage chain from scratch
             recalculateStageChain();
+
+            targetWords = stages.map(s => s.targetWord);
 
             renderPuzzleBuilder();
         } else {
@@ -1144,11 +1192,13 @@ function checkSourceWordSpelling(stageIndex) {
 }
 
 function addRandomLettersToStage(stageIndex, letters) {
-    if (!letters) return;
+    // Only real letters may enter the pool — a stray '-' or space would
+    // poison every downstream letter count.
+    const clean = (letters || '').toLowerCase().replace(/[^a-z]/g, '');
+    if (!clean) return;
     const stage = stages[stageIndex];
-    stage.randomLetters = (stage.randomLetters || '') + letters;
-    stage.letterPool = sortString((stage.letterPool || '') + letters);
-    renderPuzzleBuilder();
+    stage.randomLetters = (stage.randomLetters || '') + clean;
+    // letterPool is re-derived from randomLetters by the chain recalc
     autoValidateStage(stageIndex);
 }
 
@@ -1174,9 +1224,7 @@ function removeRandomLetter(stageIndex, letter, occurrenceIndex) {
     if (!removed) return;
 
     stage.randomLetters = updatedRandom;
-    stage.letterPool = sortString(removeFirstOccurrence(stage.letterPool || '', letter));
-
-    renderPuzzleBuilder();
+    // letterPool is re-derived from randomLetters by the chain recalc
     autoValidateStage(stageIndex);
 }
 
@@ -1193,14 +1241,12 @@ function addSourceWord(stageIndex) {
             checkDiv.innerHTML = '';
         }
         addRandomLettersToStage(stageIndex, word);
+        focusSourceInput(stageIndex);
         return;
     }
 
-    if (stages[stageIndex].sourceWords.includes(word)) {
-        showMessage(stageIndex, `"${word}" is already added.`, 'error');
-        return;
-    }
-
+    // Duplicates are allowed on purpose: a puzzle can legitimately need the
+    // same word twice, and suggested combos may rely on a second copy.
     stages[stageIndex].sourceWords.push(word);
     input.value = '';
 
@@ -1210,10 +1256,16 @@ function addSourceWord(stageIndex) {
         checkDiv.innerHTML = '';
     }
 
-    renderPuzzleBuilder();
-
-    // Auto-validate after adding word
+    // Auto-validate after adding word (recalculates the chain and renders)
     autoValidateStage(stageIndex);
+    focusSourceInput(stageIndex);
+}
+
+// Re-focus the source-word input after a re-render so several words can be
+// typed in a row without reaching for the mouse.
+function focusSourceInput(stageIndex) {
+    const input = document.getElementById(`source-input-${stageIndex}`);
+    if (input) input.focus();
 }
 
 function addMissingLettersAsWord(stageIndex, letters) {
@@ -1225,11 +1277,12 @@ function addMissingLettersAsWord(stageIndex, letters) {
     addRandomLettersToStage(stageIndex, word);
 }
 
-function removeSourceWord(stageIndex, word) {
-    stages[stageIndex].sourceWords = stages[stageIndex].sourceWords.filter(w => w !== word);
-    renderPuzzleBuilder();
+function removeSourceWord(stageIndex, wordIndex) {
+    // Remove by index, not by value: with duplicates allowed, a value-based
+    // filter would strip every copy at once.
+    stages[stageIndex].sourceWords.splice(wordIndex, 1);
 
-    // Auto-validate after removing word
+    // Auto-validate after removing word (recalculates the chain and renders)
     autoValidateStage(stageIndex);
 }
 
@@ -1350,16 +1403,70 @@ function sortByBestMatch(combinations, targetWord, existingLetters, stageIndex) 
     return scored.map(item => item.combo);
 }
 
+// Apply the stage's Exact Match / No Excess filters and Sort toggle to its
+// cached search results. Single source of truth used by live progress
+// updates, the final result write, and filter-toggle re-application.
+function filterAndSortCombinations(stage, stageIndex) {
+    const filters = getStageFilters(stage);
+    const base = (filters.sort ? stage.sortedCombinations : stage.unsortedCombinations) || [];
+
+    const availableLetters = stage.letterPool || '';
+    const existingWords = stage.sourceWords.join('');
+    const allExistingLetters = availableLetters + existingWords;
+    const targetCounts = getLetterCounts(stage.targetWord);
+    const futureCounts = getFutureLetterCountsForStage(stageIndex);
+    const existingCounts = getLetterCounts(allExistingLetters);
+    const baselineRemainingCounts = getRemainingLetterCountsAfterTarget(existingCounts, targetCounts);
+
+    return base.filter(comboObj => {
+        const comboLetters = comboObj.words.join('');
+        const allLetters = allExistingLetters + comboLetters;
+        const allCounts = getLetterCounts(allLetters);
+
+        // Exact match filter: no excess letters at all
+        if (filters.exactMatch) {
+            for (const [letter, count] of Object.entries(allCounts)) {
+                const needed = targetCounts[letter] || 0;
+                if (count > needed) {
+                    return false;
+                }
+            }
+        }
+
+        // No excess filter: no leftover letters that no future target needs
+        if (filters.noExcess) {
+            const remainingCounts = getRemainingLetterCountsAfterTarget(allCounts, targetCounts);
+            if (hasExcessRelativeToFuture(remainingCounts, futureCounts, baselineRemainingCounts)) {
+                return false;
+            }
+        }
+
+        return true;
+    });
+}
+
 async function showSuggestions(stageIndex, mode = 'single') {
     const stage = stages[stageIndex];
     const suggestionsDiv = document.getElementById(`suggestions-${stageIndex}`);
     const listDiv = document.getElementById(`suggestions-list-${stageIndex}`);
+    const filters = getStageFilters(stage);
 
     // Assign a unique run id so late writes from superseded searches can
-    // detect they are stale and bail out (see toggleWordList()).
+    // detect they are stale and bail out (see invalidateStageSuggestions()).
     showSuggestions._nextId = (showSuggestions._nextId || 0) + 1;
     const myRunId = showSuggestions._nextId;
     stage.activeRunId = myRunId;
+
+    // A new search invalidates the previous run's caches immediately, so
+    // filter toggles / shuffle can never resurrect results computed
+    // against older letters or an older target.
+    stage.unsortedCombinations = null;
+    stage.sortedCombinations = null;
+    stage.currentCombinations = null;
+    stage.combinationsShown = 0;
+    stage.currentMode = mode;
+    stage.suggestionsOpen = true;
+    stage.searchInProgress = true;
 
     suggestionsDiv.style.display = 'block';
     const searchText = mode === 'single' ? 'Searching for single words...' : 'Searching for combinations...';
@@ -1367,189 +1474,110 @@ async function showSuggestions(stageIndex, mode = 'single') {
 
     // Use setTimeout to allow UI to update
     setTimeout(async () => {
-        // Bail if a newer search (or toggleWordList) has superseded us.
+        // Bail if a newer search (or an invalidation) has superseded us.
         if (stage.activeRunId !== myRunId) return;
-        // Get available letters from previous stage (if not first stage)
-        const availableLetters = stage.letterPool || '';
+        try {
+            // Get available letters from previous stage (if not first stage)
+            const availableLetters = stage.letterPool || '';
 
-        // Get letters from already-selected source words
-        const existingWords = stage.sourceWords.join('');
-        const allExistingLetters = availableLetters + existingWords;
-        const futureCounts = getFutureLetterCountsForStage(stageIndex);
-        const futureLettersForSearch = Object.keys(futureCounts);
+            // Get letters from already-selected source words
+            const existingWords = stage.sourceWords.join('');
+            const allExistingLetters = availableLetters + existingWords;
+            const futureCounts = getFutureLetterCountsForStage(stageIndex);
+            const futureLettersForSearch = Object.keys(futureCounts);
 
-        // Get global filter values
-        const minLengthInput = document.getElementById('global-min-length');
-        const maxLengthInput = document.getElementById('global-max-length');
-        const minLength = minLengthInput ? parseInt(minLengthInput.value) || 2 : 2;
-        const maxLength = maxLengthInput ? parseInt(maxLengthInput.value) || 10 : 10;
+            // Get global filter values
+            const minLengthInput = document.getElementById('global-min-length');
+            const maxLengthInput = document.getElementById('global-max-length');
+            const minLength = minLengthInput ? parseInt(minLengthInput.value) || 2 : 2;
+            const maxLength = maxLengthInput ? parseInt(maxLengthInput.value) || 10 : 10;
 
-        // Set min/max words based on mode
-        let minWords, maxWords;
-        if (mode === 'single') {
-            minWords = 1;
-            maxWords = 1;
-        } else {
-            minWords = 2;
-            maxWords = 3;
-        }
+            // Set min/max words based on mode
+            const minWords = mode === 'single' ? 1 : 2;
+            const maxWords = mode === 'single' ? 1 : 3;
 
-        // Check if incomplete toggle is enabled (only for single word mode)
-        const incompleteToggle = document.getElementById(`incomplete-toggle-${stageIndex}`);
-        const includeIncomplete = mode === 'single' && incompleteToggle && incompleteToggle.checked;
+            // Incomplete matches only apply to single-word mode
+            const includeIncomplete = mode === 'single' && filters.incomplete;
 
-        // Set default sort based on mode: on for 'single', off for 'combo'
-        const defaultSort = mode === 'single';
-        const sortToggle = document.getElementById(`sort-toggle-${stageIndex}`);
-        if (sortToggle) {
-            sortToggle.checked = defaultSort;
-        }
+            const throttleProgress = mode === 'combo';
+            const progressThrottleMs = 250;
+            const progressMinDelta = 200;
+            let lastProgressUpdateTime = 0;
+            let lastProgressUpdateCount = 0;
 
-        stage.currentMode = mode;
-        stage.searchInProgress = true;
+            // Progress callback to render results as they're found
+            const progressCallback = (currentCombinations) => {
+                // Discard writes from a superseded search (stale gen).
+                if (stage.activeRunId !== myRunId) return;
+                if (currentCombinations.length === 0) return;
 
-        const throttleProgress = mode === 'combo';
-        const progressThrottleMs = 250;
-        const progressMinDelta = 200;
-        let lastProgressUpdateTime = 0;
-        let lastProgressUpdateCount = 0;
+                if (throttleProgress) {
+                    const now = (typeof performance !== 'undefined' && typeof performance.now === 'function')
+                        ? performance.now()
+                        : Date.now();
+                    const timeSinceLast = now - lastProgressUpdateTime;
+                    const countDelta = currentCombinations.length - lastProgressUpdateCount;
+                    if (lastProgressUpdateTime !== 0 && timeSinceLast < progressThrottleMs && countDelta < progressMinDelta) {
+                        return;
+                    }
+                    lastProgressUpdateTime = now;
+                    lastProgressUpdateCount = currentCombinations.length;
+                }
 
-        // Progress callback to render results as they're found
-        const progressCallback = (currentCombinations) => {
-            // Discard writes from a superseded search (stale gen).
+                stage.unsortedCombinations = currentCombinations;
+                stage.sortedCombinations = sortByBestMatch(currentCombinations, stage.targetWord, allExistingLetters, stageIndex);
+                stage.currentCombinations = filterAndSortCombinations(stage, stageIndex);
+                stage.combinationsShown = 0;
+                renderSuggestions(stageIndex, mode);
+            };
+
+            const combinations = await findWordCombinations(
+                stage.targetWord,
+                allExistingLetters,
+                minWords,
+                maxWords,
+                minLength,
+                maxLength,
+                includeIncomplete,
+                progressCallback,
+                0,
+                { futureLetters: futureLettersForSearch, mode }
+            );
+
+            // If a newer run superseded us while we were awaiting, bail out —
+            // do NOT overwrite the newer run's results.
             if (stage.activeRunId !== myRunId) return;
-            if (currentCombinations.length === 0) return;
 
-            if (throttleProgress) {
-                const now = (typeof performance !== 'undefined' && typeof performance.now === 'function')
-                    ? performance.now()
-                    : Date.now();
-                const timeSinceLast = now - lastProgressUpdateTime;
-                const countDelta = currentCombinations.length - lastProgressUpdateCount;
-                if (lastProgressUpdateTime !== 0 && timeSinceLast < progressThrottleMs && countDelta < progressMinDelta) {
-                    return;
-                }
-                lastProgressUpdateTime = now;
-                lastProgressUpdateCount = currentCombinations.length;
-            }
+            stage.searchInProgress = false;
 
-            // Store both sorted and unsorted versions
-            stage.unsortedCombinations = currentCombinations;
-            stage.sortedCombinations = sortByBestMatch(currentCombinations, stage.targetWord, allExistingLetters, stageIndex);
-
-            // Apply filters
-            const sortToggle = document.getElementById(`sort-toggle-${stageIndex}`);
-            const exactMatchToggle = document.getElementById(`exact-match-toggle-${stageIndex}`);
-            const noExcessToggle = document.getElementById(`no-excess-toggle-${stageIndex}`);
-
-            let finalCombinations = defaultSort ? stage.sortedCombinations : stage.unsortedCombinations;
-
-            const targetCounts = getLetterCounts(stage.targetWord);
-            const existingCounts = getLetterCounts(allExistingLetters);
-            const baselineRemainingCounts = getRemainingLetterCountsAfterTarget(existingCounts, targetCounts);
-
-            finalCombinations = finalCombinations.filter(comboObj => {
-                const comboLetters = comboObj.words.join('');
-                const allLetters = allExistingLetters + comboLetters;
-                const allCounts = getLetterCounts(allLetters);
-
-                // Exact match filter
-                if (exactMatchToggle && exactMatchToggle.checked) {
-                    for (const [letter, count] of Object.entries(allCounts)) {
-                        const needed = targetCounts[letter] || 0;
-                        if (count > needed) {
-                            return false;
-                        }
-                    }
-                }
-
-                // No excess filter
-                if (noExcessToggle && noExcessToggle.checked) {
-                    const remainingCounts = getRemainingLetterCountsAfterTarget(allCounts, targetCounts);
-                    if (hasExcessRelativeToFuture(remainingCounts, futureCounts, baselineRemainingCounts)) {
-                        return false;
-                    }
-                }
-
-                return true;
-            });
-
-            stage.currentCombinations = finalCombinations;
+            // Cache even an empty result so filter toggles and shuffle
+            // operate on THIS search, never on a previous run's leftovers.
+            stage.unsortedCombinations = combinations;
+            stage.sortedCombinations = sortByBestMatch(combinations, stage.targetWord, allExistingLetters, stageIndex);
+            stage.currentCombinations = filterAndSortCombinations(stage, stageIndex);
             stage.combinationsShown = 0;
 
+            if (combinations.length === 0) {
+                const message = mode === 'single'
+                    ? 'No single words found to complete the puzzle. Try adjusting filters or adding manually.'
+                    : 'No combinations found. Try adjusting filters or adding words manually.';
+                // Re-query: a re-render may have replaced the list element
+                // since this search started.
+                const liveListDiv = document.getElementById(`suggestions-list-${stageIndex}`);
+                if (liveListDiv) liveListDiv.innerHTML = `<p style="padding: 12px; color: #666;">${message}</p>`;
+                return;
+            }
+
             renderSuggestions(stageIndex, mode);
-        };
-
-        const combinations = await findWordCombinations(
-            stage.targetWord,
-            allExistingLetters,
-            minWords,
-            maxWords,
-            minLength,
-            maxLength,
-            includeIncomplete,
-            progressCallback,
-            0,
-            { futureLetters: futureLettersForSearch, mode }
-        );
-
-        // If a newer run superseded us while we were awaiting, bail out —
-        // do NOT overwrite the newer run's results.
-        if (stage.activeRunId !== myRunId) return;
-
-        stage.searchInProgress = false;
-
-        if (combinations.length === 0) {
-            const message = mode === 'single'
-                ? 'No single words found to complete the puzzle. Try adjusting filters or adding manually.'
-                : 'No combinations found. Try adjusting filters or adding words manually.';
-            listDiv.innerHTML = `<p style="padding: 12px; color: #666;">${message}</p>`;
-            return;
+        } catch (err) {
+            // Never leave the stage stuck in "finding more..." state
+            if (stage.activeRunId === myRunId) {
+                stage.searchInProgress = false;
+                const liveListDiv = document.getElementById(`suggestions-list-${stageIndex}`);
+                if (liveListDiv) liveListDiv.innerHTML = `<p style="padding: 12px; color: #dc2626;">Search failed: ${escHtml(err && err.message ? err.message : err)}</p>`;
+            }
+            console.error('Suggestion search failed', err);
         }
-
-        // Final update with all combinations
-        stage.unsortedCombinations = combinations;
-        stage.sortedCombinations = sortByBestMatch(combinations, stage.targetWord, allExistingLetters, stageIndex);
-
-        // Apply filters
-        const exactMatchToggle = document.getElementById(`exact-match-toggle-${stageIndex}`);
-        const noExcessToggle = document.getElementById(`no-excess-toggle-${stageIndex}`);
-        let finalCombinations = defaultSort ? stage.sortedCombinations : stage.unsortedCombinations;
-
-        const targetCounts = getLetterCounts(stage.targetWord);
-        const existingCounts = getLetterCounts(allExistingLetters);
-        const baselineRemainingCounts = getRemainingLetterCountsAfterTarget(existingCounts, targetCounts);
-
-        finalCombinations = finalCombinations.filter(comboObj => {
-            const comboLetters = comboObj.words.join('');
-            const allLetters = allExistingLetters + comboLetters;
-            const allCounts = getLetterCounts(allLetters);
-
-            // Exact match filter
-            if (exactMatchToggle && exactMatchToggle.checked) {
-                for (const [letter, count] of Object.entries(allCounts)) {
-                    const needed = targetCounts[letter] || 0;
-                    if (count > needed) {
-                        return false;
-                    }
-                }
-            }
-
-            // No excess filter
-            if (noExcessToggle && noExcessToggle.checked) {
-                const remainingCounts = getRemainingLetterCountsAfterTarget(allCounts, targetCounts);
-                if (hasExcessRelativeToFuture(remainingCounts, futureCounts, baselineRemainingCounts)) {
-                    return false;
-                }
-            }
-
-            return true;
-        });
-
-        stage.currentCombinations = finalCombinations;
-        stage.combinationsShown = 0;
-
-        renderSuggestions(stageIndex, mode);
     }, 10);
 }
 
@@ -1649,7 +1677,7 @@ function renderSuggestions(stageIndex, mode) {
         }).join('');
     };
 
-    const itemsHTML = batch.map(comboObj => {
+    const itemsHTML = batch.map((comboObj, batchIdx) => {
         let comboText;
         const warningIcon = comboObj.complete ? '' : '<span style="color: var(--burnt-sienna); margin-right: 4px;" title="Incomplete - missing some letters">⚠️</span>';
 
@@ -1658,7 +1686,7 @@ function renderSuggestions(stageIndex, mode) {
         } else {
             comboText = '(use available letters only)';
         }
-        return `<div class="suggestion-item" onclick="selectCombination(${stageIndex}, ${JSON.stringify(comboObj.words).replace(/"/g, '&quot;')})">${warningIcon}${comboText}</div>`;
+        return `<div class="suggestion-item" onclick="selectCombinationByIndex(${stageIndex}, ${startIndex + batchIdx})">${warningIcon}${comboText}</div>`;
     }).join('');
 
     const hasMore = endIndex < combinations.length;
@@ -1681,13 +1709,21 @@ function renderSuggestions(stageIndex, mode) {
     } else {
         // Append more items
         const itemsContainer = document.getElementById(`suggestions-items-${stageIndex}`);
+        if (!itemsContainer) {
+            // The panel DOM was rebuilt since the last batch — start over
+            stage.combinationsShown = 0;
+            renderSuggestions(stageIndex, mode);
+            return;
+        }
         itemsContainer.insertAdjacentHTML('beforeend', itemsHTML);
 
         const loadMoreContainer = document.getElementById(`load-more-container-${stageIndex}`);
-        if (hasMore) {
-            loadMoreContainer.querySelector('p').textContent = countText;
-        } else {
-            loadMoreContainer.innerHTML = `<p style="font-size: 11px; color: #666; text-align: center;">${countText}</p>`;
+        if (loadMoreContainer) {
+            if (hasMore) {
+                loadMoreContainer.querySelector('p').textContent = countText;
+            } else {
+                loadMoreContainer.innerHTML = `<p style="font-size: 11px; color: #666; text-align: center;">${countText}</p>`;
+            }
         }
     }
 
@@ -1699,6 +1735,8 @@ function loadMoreSuggestions(stageIndex, mode) {
 }
 
 function toggleSort(stageIndex) {
+    const toggle = document.getElementById(`sort-toggle-${stageIndex}`);
+    getStageFilters(stages[stageIndex]).sort = !!(toggle && toggle.checked);
     applyFilters(stageIndex);
 }
 
@@ -1716,98 +1754,65 @@ function shuffleSuggestions(stageIndex) {
 }
 
 function toggleIncomplete(stageIndex) {
-    // Only refresh if suggestions are currently visible
     const stage = stages[stageIndex];
-    const suggestionsDiv = document.getElementById(`suggestions-${stageIndex}`);
-    if (suggestionsDiv && suggestionsDiv.style.display !== 'none' && stage.currentMode) {
-        // Re-run the suggestions with the new incomplete setting
+    const toggle = document.getElementById(`incomplete-toggle-${stageIndex}`);
+    getStageFilters(stage).incomplete = !!(toggle && toggle.checked);
+    // Incomplete-inclusion changes the search itself, not just the filter
+    if (stage.suggestionsOpen && stage.currentMode) {
         showSuggestions(stageIndex, stage.currentMode);
     }
 }
 
 function toggleExactMatch(stageIndex) {
+    const toggle = document.getElementById(`exact-match-toggle-${stageIndex}`);
+    getStageFilters(stages[stageIndex]).exactMatch = !!(toggle && toggle.checked);
     applyFilters(stageIndex);
 }
 
 function toggleNoExcess(stageIndex) {
+    const toggle = document.getElementById(`no-excess-toggle-${stageIndex}`);
+    getStageFilters(stages[stageIndex]).noExcess = !!(toggle && toggle.checked);
     applyFilters(stageIndex);
 }
 
 function applyFilters(stageIndex) {
     const stage = stages[stageIndex];
-    const suggestionsDiv = document.getElementById(`suggestions-${stageIndex}`);
+    if (!stage.suggestionsOpen || !stage.currentMode) return;
 
-    if (suggestionsDiv && suggestionsDiv.style.display !== 'none' && stage.currentMode) {
-        const sortToggle = document.getElementById(`sort-toggle-${stageIndex}`);
-        const exactMatchToggle = document.getElementById(`exact-match-toggle-${stageIndex}`);
-        const noExcessToggle = document.getElementById(`no-excess-toggle-${stageIndex}`);
+    // No cached search to filter yet: either none has run or one is still
+    // in flight (zero-result runs cache empty arrays, so null means "no
+    // completed search for the current state").
+    if (!stage.sortedCombinations || !stage.unsortedCombinations) return;
 
-        const baseSource = sortToggle.checked ? stage.sortedCombinations : stage.unsortedCombinations;
-
-        const existingWords = stage.sourceWords.join('');
-        const availableLetters = stage.letterPool || '';
-        const allExistingLetters = availableLetters + existingWords;
-        const targetCounts = getLetterCounts(stage.targetWord);
-        const futureCounts = getFutureLetterCountsForStage(stageIndex);
-        const existingCounts = getLetterCounts(allExistingLetters);
-        const baselineRemainingCounts = getRemainingLetterCountsAfterTarget(existingCounts, targetCounts);
-
-        // Apply both filters
-        stage.currentCombinations = baseSource.filter(comboObj => {
-            const comboLetters = comboObj.words.join('');
-            const allLetters = allExistingLetters + comboLetters;
-            const allCounts = getLetterCounts(allLetters);
-
-            // Exact match filter: no excess letters at all
-            if (exactMatchToggle && exactMatchToggle.checked) {
-                for (const [letter, count] of Object.entries(allCounts)) {
-                    const needed = targetCounts[letter] || 0;
-                    if (count > needed) {
-                        return false; // Has excess letters
-                    }
-                }
-            }
-
-            // No excess filter: no letters that would be red (not in current or future targets)
-            if (noExcessToggle && noExcessToggle.checked) {
-                const remainingCounts = getRemainingLetterCountsAfterTarget(allCounts, targetCounts);
-                if (hasExcessRelativeToFuture(remainingCounts, futureCounts, baselineRemainingCounts)) {
-                    return false; // Leaves additional letters that future targets will never use
-                }
-            }
-
-            return true;
-        });
-
-        // Reset to show from the beginning
-        stage.combinationsShown = 0;
-        renderSuggestions(stageIndex, stage.currentMode);
-    }
+    stage.currentCombinations = filterAndSortCombinations(stage, stageIndex);
+    stage.combinationsShown = 0;
+    renderSuggestions(stageIndex, stage.currentMode);
 }
 
 function hideSuggestions(stageIndex) {
-    document.getElementById(`suggestions-${stageIndex}`).style.display = 'none';
+    stages[stageIndex].suggestionsOpen = false;
+    const div = document.getElementById(`suggestions-${stageIndex}`);
+    if (div) div.style.display = 'none';
+}
+
+// Suggestion items reference their combination by index into the stage's
+// current (filtered) list — no word strings pass through HTML attributes.
+function selectCombinationByIndex(stageIndex, comboIndex) {
+    const stage = stages[stageIndex];
+    const comboObj = (stage.currentCombinations || [])[comboIndex];
+    if (!comboObj) return;
+    selectCombination(stageIndex, comboObj.words);
 }
 
 function selectCombination(stageIndex, combo) {
     const stage = stages[stageIndex];
 
-    // If there are already words selected, add the suggestion to them
-    // Otherwise, replace with the suggestion
-    if (stage.sourceWords.length > 0) {
-        // Add combo words to existing words (avoiding duplicates)
-        const combined = [...stage.sourceWords];
-        for (const word of combo) {
-            if (!combined.includes(word)) {
-                combined.push(word);
-            }
-        }
-        stage.sourceWords = combined;
-    } else {
-        stage.sourceWords = [...combo];
-    }
+    // Append the suggestion's words to any existing selection, KEEPING
+    // duplicates: the search counted the letters of the existing words plus
+    // every suggested word, so dropping a duplicate would silently break
+    // the letter math the suggestion was validated with.
+    stage.sourceWords = [...stage.sourceWords, ...combo];
 
-    renderPuzzleBuilder();
     hideSuggestions(stageIndex);
 
     // Auto-validate after selecting combination
@@ -1818,6 +1823,19 @@ function autoValidateStage(stageIndex) {
     // Recalculate from this stage onwards (cascading through the chain)
     recalculateStageChainFrom(stageIndex);
     renderPuzzleBuilder();
+
+    // Letter pools from this stage down changed, so cached suggestions are
+    // stale: re-run searches for panels the user has open, drop the rest.
+    for (let i = stageIndex; i < stages.length; i++) {
+        const stage = stages[i];
+        if (stage.suggestionsOpen && stage.currentMode && stage.targetWord) {
+            showSuggestions(i, stage.currentMode);
+        } else {
+            const wasOpen = stage.suggestionsOpen;
+            invalidateStageSuggestions(stage);
+            stage.suggestionsOpen = wasOpen;
+        }
+    }
 }
 
 function validateStage(stageIndex) {
@@ -1850,14 +1868,26 @@ function validateStage(stageIndex) {
     renderPuzzleBuilder();
 }
 
+const messageTimeouts = {};
+
 function showMessage(stageIndex, message, type) {
     const messageDiv = document.getElementById(`message-${stageIndex}`);
+    if (!messageDiv) return;
     messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
     messageDiv.textContent = message;
 
-    setTimeout(() => {
-        messageDiv.textContent = '';
-        messageDiv.className = '';
+    // A newer message must not be wiped early by an older message's timer
+    if (messageTimeouts[stageIndex]) {
+        clearTimeout(messageTimeouts[stageIndex]);
+    }
+    messageTimeouts[stageIndex] = setTimeout(() => {
+        delete messageTimeouts[stageIndex];
+        // Re-query: the element may have been rebuilt by a re-render
+        const liveDiv = document.getElementById(`message-${stageIndex}`);
+        if (liveDiv) {
+            liveDiv.textContent = '';
+            liveDiv.className = '';
+        }
     }, 5000);
 }
 
@@ -1931,8 +1961,10 @@ function sharePuzzle() {
 
         // Show starting letters or carry-over letters
         if (index === 0 && stage.letterPool) {
-            // First stage - show which letters you start with
-            const carryOver = stage.letterPool.split('').filter(letter => !stage.randomLetters.includes(letter)).join('');
+            // First stage - show which letters you start with.
+            // Multiset subtraction: only remove as many copies of a letter
+            // as randomLetters actually contains.
+            const carryOver = subtractLetters(stage.letterPool, stage.randomLetters || '');
             const given = stage.randomLetters || '';
 
             if (carryOver && given) {
@@ -2074,47 +2106,56 @@ function importJSON() {
             throw new Error("Invalid JSON: 'stages' array is missing.");
         }
 
-        // Reconstruct stages
-        const newStages = [];
+        const asWordArray = (value, label) => {
+            if (value == null) return [];
+            if (!Array.isArray(value)) {
+                throw new Error(`Invalid JSON: '${label}' must be an array of words.`);
+            }
+            return value.map(w => String(w).trim().toLowerCase()).filter(w => w);
+        };
+        const asLetterString = (value, label) => {
+            if (value == null) return '';
+            if (typeof value !== 'string') {
+                throw new Error(`Invalid JSON: '${label}' must be a string.`);
+            }
+            return value.toLowerCase().replace(/[^a-z]/g, '');
+        };
 
-        for (let i = 0; i < data.stages.length; i++) {
-            const stageData = data.stages[i];
-
-            // Reconstruct sourceWords and randomLetters for the CURRENT stage
-            // Stage 0 comes from introWords/introLooseLetters
-            // Stage N comes from stage[N-1].rewardWords/rewardLooseLetters
-            let sourceWords = [];
-            let randomLetters = "";
-
-            if (i === 0) {
-                sourceWords = data.introWords || [];
-                randomLetters = data.introLooseLetters || "";
-            } else {
-                const prevStage = data.stages[i - 1];
-                sourceWords = prevStage.rewardWords || [];
-                randomLetters = prevStage.rewardLooseLetters || "";
+        // Build and validate the new stages COMPLETELY before touching any
+        // global state, so a malformed file can never leave the builder
+        // half-imported with the UI out of sync.
+        // Stage 0's words/letters come from introWords/introLooseLetters;
+        // stage N's come from stage N-1's rewardWords/rewardLooseLetters.
+        const newStages = data.stages.map((stageData, i) => {
+            if (!stageData || typeof stageData !== 'object') {
+                throw new Error(`Invalid JSON: stage ${i + 1} is not an object.`);
+            }
+            if (stageData.targetWord != null && typeof stageData.targetWord !== 'string') {
+                throw new Error(`Invalid JSON: stage ${i + 1} targetWord must be a string.`);
             }
 
-            const stage = {
-                targetWord: stageData.targetWord || '',
-                dialogue: stageData.dialogue || '',
-                sourceWords: sourceWords,
-                letterPool: '', // Will be calculated by renderPuzzleBuilder or generate step
-                remainingLetters: '', // Will be calculated
-                complete: false,
-                isFirst: i === 0,
-                randomLetters: randomLetters
-            };
+            const stage = createEmptyStage(i === 0);
+            stage.targetWord = (stageData.targetWord || '').trim().toLowerCase();
+            stage.dialogue = stageData.dialogue != null ? String(stageData.dialogue) : '';
+            if (i === 0) {
+                stage.sourceWords = asWordArray(data.introWords, 'introWords');
+                stage.randomLetters = asLetterString(data.introLooseLetters, 'introLooseLetters');
+            } else {
+                const prev = data.stages[i - 1];
+                stage.sourceWords = asWordArray(prev.rewardWords, `stages[${i - 1}].rewardWords`);
+                stage.randomLetters = asLetterString(prev.rewardLooseLetters, `stages[${i - 1}].rewardLooseLetters`);
+            }
+            return stage;
+        });
 
-            newStages.push(stage);
-        }
-
-        // Apply the new state
+        // Everything validated — commit. Poison in-flight searches tied to
+        // the old stage objects first.
+        invalidateAllStageSuggestions();
         stages = newStages;
         targetWords = stages.map(s => s.targetWord);
         currentStage = 0;
 
-        introDialogue = data.introDialogue || '';
+        introDialogue = data.introDialogue != null ? String(data.introDialogue) : '';
         const introInput = document.getElementById('intro-dialogue-input');
         if (introInput) introInput.value = introDialogue;
 
@@ -2123,12 +2164,6 @@ function importJSON() {
         closeImportModal();
         renderPuzzleBuilder();
 
-        // Update inputs
-        stages.forEach((stage, index) => {
-            const input = document.getElementById(`target-input-${index}`);
-            if (input) input.value = stage.targetWord;
-        });
-
     } catch (error) {
         alert("Error importing JSON: " + error.message);
     }
@@ -2136,18 +2171,17 @@ function importJSON() {
 
 function startOver() {
     if (confirm('Are you sure you want to start over? This will clear all your progress.')) {
-        targetWords = [];
+        // Poison in-flight searches tied to the old stage objects
+        invalidateAllStageSuggestions();
+
         introDialogue = '';
         const introInput = document.getElementById('intro-dialogue-input');
         if (introInput) introInput.value = '';
 
-        stages = [];
+        // Reset to the same two empty stages the builder starts with
+        stages = [createEmptyStage(true), createEmptyStage(false)];
+        targetWords = ['', ''];
         currentStage = 0;
-
-        // Clear inputs
-        document.querySelectorAll('.target-word-input').forEach(input => {
-            input.value = '';
-        });
 
         renderPuzzleBuilder();
     }
@@ -2482,8 +2516,8 @@ function findTargetSuggestions(stageIndex, availableLetters) {
                 </div>
                 <div style="display: flex; flex-wrap: wrap; gap: 6px; max-height: 200px; overflow-y: auto;">
                     ${exactMatches.map(word => `
-                        <div class="suggestion-item" onclick="selectTargetWord(${stageIndex}, '${word}')" style="cursor: pointer; padding: 6px 10px; font-size: 12px;">
-                            ${word}
+                        <div class="suggestion-item" data-word="${escHtml(word)}" onclick="selectTargetWord(${stageIndex}, this.dataset.word)" style="cursor: pointer; padding: 6px 10px; font-size: 12px;">
+                            ${escHtml(word)}
                         </div>
                     `).join('')}
                 </div>
@@ -2509,8 +2543,8 @@ function findTargetSuggestions(stageIndex, availableLetters) {
                 </div>
                 <div style="display: flex; flex-wrap: wrap; gap: 6px; max-height: 200px; overflow-y: auto;">
                     ${partialMatches.slice(0, displayCount).map(word => `
-                        <div class="suggestion-item" onclick="selectTargetWord(${stageIndex}, '${word}')" style="cursor: pointer; padding: 6px 10px; font-size: 12px;">
-                            ${word}
+                        <div class="suggestion-item" data-word="${escHtml(word)}" onclick="selectTargetWord(${stageIndex}, this.dataset.word)" style="cursor: pointer; padding: 6px 10px; font-size: 12px;">
+                            ${escHtml(word)}
                         </div>
                     `).join('')}
                 </div>
@@ -2543,16 +2577,13 @@ function clearSourceWords() {
         stage.letterPool = '';
         stage.randomLetters = '';
         stage.complete = false;
+        invalidateStageSuggestions(stage);
     });
 
     targetWords = stages.map(s => s.targetWord);
     renderPuzzleBuilder();
 
-    const statusDiv = document.getElementById('auto-generate-status');
-    if (statusDiv) {
-        statusDiv.innerHTML = '<span style="color: #2563eb;">Source words cleared</span>';
-        setTimeout(() => statusDiv.innerHTML = '', 2500);
-    }
+    setAutoGenStatus('<span style="color: #2563eb;">Source words cleared</span>', 2500);
 }
 
 function toggleWordList() {
@@ -2570,25 +2601,20 @@ function toggleWordList() {
     }
 
     // Invalidate cached results AND abort any in-flight searches on EVERY
-    // stage. Setting activeRunId to a unique sentinel causes the original
-    // search's late writes (progress callback + final write) to be discarded,
-    // eliminating the race where a stale search overwrites new results.
+    // stage, then re-run the search for stages whose panel is open.
+    // showSuggestions assigns its own fresh activeRunId, so writes from the
+    // re-run succeed while the superseded search's late writes are discarded.
     stages.forEach((stage, index) => {
-        stage.activeRunId = -1;
-        stage.searchInProgress = false;
-        stage.sortedCombinations = null;
-        stage.unsortedCombinations = null;
-        stage.currentCombinations = null;
-        stage.combinationsShown = 0;
-
-        // Re-run the search for any stage whose suggestions panel is open.
-        // showSuggestions assigns its own fresh activeRunId, so subsequent
-        // writes from THIS call will succeed.
-        const suggestionsDiv = document.getElementById(`suggestions-${index}`);
-        if (suggestionsDiv && suggestionsDiv.style.display !== 'none' && stage.currentMode && stage.targetWord) {
-            showSuggestions(index, stage.currentMode);
+        const wasOpen = stage.suggestionsOpen;
+        const mode = stage.currentMode;
+        invalidateStageSuggestions(stage);
+        if (wasOpen && mode && stage.targetWord) {
+            showSuggestions(index, mode);
         }
     });
+
+    // Dictionary membership changed: refresh spell-check highlights and tags
+    renderPuzzleBuilder();
 
     // Word Finder caches its last results. If the Word Finder tab is active
     // and has results on screen, re-run its search with the new list.
@@ -2615,7 +2641,11 @@ const AUTO_SOLVER_CONFIG = {
     maxRandomLettersPerStage: 3,
     maxCandidatesPerStage: 40,
     maxSearchNodes: 12000,
-    maxCarryoverLetters: 15
+    maxCarryoverLetters: 15,
+    // Cap raw combos per findWordCombinations call: only ~40 candidates
+    // survive per stage anyway, and uncapped allowMissing enumeration can
+    // produce millions of pairs (minutes of apparent hang per stage).
+    maxCombosPerStage: 3000
 };
 
 class PuzzleAutoSolver {
@@ -2741,7 +2771,7 @@ class PuzzleAutoSolver {
                 false,
                 null,
                 this.config.maxRandomLettersPerStage,
-                { futureLetters: futureLettersForSearch }
+                { futureLetters: futureLettersForSearch, maxResults: this.config.maxCombosPerStage }
             ) || [];
 
             const candidateMap = new Map();
@@ -2863,82 +2893,105 @@ class PuzzleAutoSolver {
     }
 }
 
-async function autoGeneratePuzzle() {
+// Managed writer for the auto-generate status line: clearing timers from a
+// previous message must never wipe a newer message (or an active search).
+let autoGenStatusTimer = null;
+function setAutoGenStatus(html, clearAfterMs) {
     const statusDiv = document.getElementById('auto-generate-status');
+    if (!statusDiv) return;
+    if (autoGenStatusTimer) {
+        clearTimeout(autoGenStatusTimer);
+        autoGenStatusTimer = null;
+    }
+    statusDiv.innerHTML = html;
+    if (clearAfterMs) {
+        autoGenStatusTimer = setTimeout(() => {
+            statusDiv.innerHTML = '';
+            autoGenStatusTimer = null;
+        }, clearAfterMs);
+    }
+}
+
+async function autoGeneratePuzzle() {
+    const generateBtn = document.getElementById('btn-auto-generate');
+
+    if (stages.length === 0) {
+        setAutoGenStatus('<span style="color: #dc2626;">⚠️ Add at least one stage first</span>', 3000);
+        return;
+    }
 
     const emptyStages = stages.filter(s => !s.targetWord.trim());
     if (emptyStages.length > 0) {
-        statusDiv.innerHTML = '<span style="color: #dc2626;">⚠️ Please fill in all target words first</span>';
-        setTimeout(() => statusDiv.innerHTML = '', 3000);
+        setAutoGenStatus('<span style="color: #dc2626;">⚠️ Please fill in all target words first</span>', 3000);
         return;
     }
 
-    statusDiv.innerHTML = '<span style="color: #667eea;">⏳ Searching for a perfect puzzle...</span>';
+    setAutoGenStatus('<span style="color: #667eea;">⏳ Searching for a perfect puzzle...</span>');
+    if (generateBtn) generateBtn.disabled = true;
 
-    stages.forEach(stage => {
-        stage.sourceWords = [];
-        stage.complete = false;
-        stage.remainingLetters = '';
-        stage.letterPool = '';
-        stage.randomLetters = '';
-    });
+    // Snapshot the targets: the solver yields to the event loop, so the
+    // user can keep editing while it runs. Solve against the snapshot and
+    // refuse to apply the plan if the puzzle changed underneath it.
+    // The current puzzle is NOT wiped up front — a failed run must leave
+    // the user's hand-built words untouched.
+    const targetSnapshot = stages.map(s => s.targetWord.trim().toLowerCase());
+    const stageData = targetSnapshot.map(targetWord => ({
+        targetWord,
+        targetCounts: getLetterCountsArray(targetWord)
+    }));
 
-    const stageData = stages.map(stage => {
-        const targetWord = stage.targetWord.trim().toLowerCase();
-        return {
-            targetWord,
-            targetCounts: getLetterCountsArray(targetWord)
-        };
-    });
+    try {
+        const solver = new PuzzleAutoSolver(stageData, {
+            allowFirstStageRandom: isFirstStageRandomAllowed()
+        });
+        const result = await solver.solve();
 
-    const solver = new PuzzleAutoSolver(stageData, {
-        allowFirstStageRandom: isFirstStageRandomAllowed()
-    });
-    const result = await solver.solve();
-
-    if (!result) {
-        renderPuzzleBuilder();
-        statusDiv.innerHTML = '<span style="color: #dc2626;">⚠️ Unable to generate a puzzle with these targets. Try adjusting the words.</span>';
-        setTimeout(() => statusDiv.innerHTML = '', 6000);
-        return;
-    }
-
-    const plan = result.stages;
-    if (!plan || plan.length !== stages.length) {
-        renderPuzzleBuilder();
-        statusDiv.innerHTML = '<span style="color: #dc2626;">⚠️ Unexpected error while generating puzzle.</span>';
-        setTimeout(() => statusDiv.innerHTML = '', 6000);
-        return;
-    }
-
-    let totalRandomLetters = 0;
-    for (let i = 0; i < stages.length; i++) {
-        const stage = stages[i];
-        const planStage = plan[i];
-        stage.sourceWords = [...planStage.sourceWords];
-        stage.randomLetters = planStage.randomLetters || '';
-        stage.letterPool = planStage.letterPool || '';
-        const allLetters = stage.letterPool + stage.sourceWords.join('');
-        stage.complete = canMakeWord(stage.targetWord, allLetters);
-        stage.remainingLetters = subtractLetters(allLetters, stage.targetWord);
-        if (i < stages.length - 1) {
-            stages[i + 1].letterPool = stage.remainingLetters;
+        const targetsNow = stages.map(s => s.targetWord.trim().toLowerCase());
+        const puzzleChanged = targetsNow.length !== targetSnapshot.length ||
+            targetsNow.some((t, i) => t !== targetSnapshot[i]);
+        if (puzzleChanged) {
+            setAutoGenStatus('<span style="color: #dc2626;">⚠️ Puzzle changed while generating — result discarded. Click again to regenerate.</span>', 6000);
+            return;
         }
-        totalRandomLetters += stage.randomLetters.length;
-    }
 
-    renderPuzzleBuilder();
+        if (!result) {
+            setAutoGenStatus('<span style="color: #dc2626;">⚠️ Unable to generate a puzzle with these targets. Try adjusting the words (your current words were left untouched).</span>', 6000);
+            return;
+        }
 
-    const finalRemaining = stages[stages.length - 1].remainingLetters;
-    if (result.success) {
-        if (totalRandomLetters === 0) {
-            statusDiv.innerHTML = '<span style="color: #28a745;">✓ Perfect puzzle generated with no random letters!</span>';
+        const plan = result.stages;
+        if (!plan || plan.length !== stages.length) {
+            setAutoGenStatus('<span style="color: #dc2626;">⚠️ Unexpected error while generating puzzle.</span>', 6000);
+            return;
+        }
+
+        // Apply the plan's words/letters, then derive pools, completion and
+        // remainders through the one canonical chain recalculation.
+        let totalRandomLetters = 0;
+        for (let i = 0; i < stages.length; i++) {
+            stages[i].sourceWords = [...plan[i].sourceWords];
+            stages[i].randomLetters = plan[i].randomLetters || '';
+            totalRandomLetters += stages[i].randomLetters.length;
+            invalidateStageSuggestions(stages[i]);
+        }
+        recalculateStageChain();
+        renderPuzzleBuilder();
+
+        const finalRemaining = stages[stages.length - 1].remainingLetters;
+        const allComplete = stages.every(s => s.complete);
+        if (result.success && allComplete) {
+            if (totalRandomLetters === 0) {
+                setAutoGenStatus('<span style="color: #28a745;">✓ Perfect puzzle generated with no random letters!</span>', 8000);
+            } else {
+                setAutoGenStatus(`<span style="color: #28a745;">✓ Perfect puzzle generated with ${totalRandomLetters} random letter${totalRandomLetters === 1 ? '' : 's'}</span>`, 8000);
+            }
         } else {
-            statusDiv.innerHTML = `<span style="color: #28a745;">✓ Perfect puzzle generated with ${totalRandomLetters} random letter${totalRandomLetters === 1 ? '' : 's'}</span>`;
+            setAutoGenStatus(`<span style="color: #ffc107;">⚠️ Best attempt leaves ${finalRemaining.length} letter${finalRemaining.length === 1 ? '' : 's'} remaining: ${finalRemaining.toUpperCase()}</span>`, 8000);
         }
-    } else {
-        statusDiv.innerHTML = `<span style="color: #ffc107;">⚠️ Best attempt leaves ${finalRemaining.length} letter${finalRemaining.length === 1 ? '' : 's'} remaining: ${finalRemaining.toUpperCase()}</span>`;
+    } catch (err) {
+        console.error('Auto-generate failed', err);
+        setAutoGenStatus('<span style="color: #dc2626;">⚠️ Auto-generate failed unexpectedly. Your puzzle was left untouched.</span>', 6000);
+    } finally {
+        if (generateBtn) generateBtn.disabled = false;
     }
-
-    setTimeout(() => statusDiv.innerHTML = '', 8000);
 }
