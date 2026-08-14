@@ -236,10 +236,11 @@
                     <h2 style="margin: 0 0 8px 0;">Word Finder</h2>
                     <p style="color: #666; font-size: 14px; margin-bottom: 20px;">
                         Enter letters or words, then find all dictionary words that can be made from those letters.
+                        Use <strong>?</strong> as a wildcard — it can be any letter and counts toward word length (e.g. app?? finds apple).
                     </p>
 
                     <div class="word-finder-input-group">
-                        <input type="text" id="word-finder-input" placeholder="Enter letters (e.g. catdog)"
+                        <input type="text" id="word-finder-input" placeholder="Enter letters (e.g. catdog, app??)"
                             onkeypress="wordFinderHandleKeypress(event)">
                         <button class="btn btn-primary" onclick="wordFinderSearch()">Search</button>
                     </div>

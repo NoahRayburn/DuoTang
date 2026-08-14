@@ -8,9 +8,22 @@ let wordFinderState = {
     initialized: false
 };
 
+// Count how many letters of `word` are not covered by the available pool.
+// Those letters must be filled by wildcard ('?') tiles.
+function countMissingLetters(word, availableCounts) {
+    const wordCounts = getLetterCounts(word);
+    let missing = 0;
+    for (const [letter, count] of Object.entries(wordCounts)) {
+        const have = availableCounts[letter] || 0;
+        if (count > have) missing += count - have;
+    }
+    return missing;
+}
+
 function wordFinderSearch() {
     const input = document.getElementById('word-finder-input');
-    const rawInput = input.value.trim().toLowerCase().replace(/[^a-z]/g, '');
+    // '?' is a wildcard tile: matches any letter, counts toward length
+    const rawInput = input.value.trim().toLowerCase().replace(/[^a-z?]/g, '');
 
     if (!rawInput) {
         document.getElementById('word-finder-summary').style.display = 'none';
@@ -29,7 +42,7 @@ function wordFinderSearch() {
     }
     const lettersList = Object.entries(letterCounts)
         .sort((a, b) => a[0].localeCompare(b[0]))
-        .map(([letter, count]) => `${letter.toUpperCase()}×${count}`)
+        .map(([letter, count]) => letter === '?' ? `?×${count} (wild)` : `${letter.toUpperCase()}×${count}`)
         .join('  ');
 
     document.getElementById('word-finder-summary').innerHTML = `
@@ -49,24 +62,19 @@ function wordFinderSearch() {
         const exactOnly = document.getElementById('wf-exact-match').checked;
 
         const results = [];
-        const inputSorted = rawInput.split('').sort().join('');
+        const wildcards = (rawInput.match(/\?/g) || []).length;
+        const availableCounts = getLetterCounts(rawInput.replace(/\?/g, ''));
 
         for (const word of currentWordList) {
             if (word.length < minLength || word.length > maxLength) continue;
             if (firstLetter && word[0] !== firstLetter) continue;
 
-            if (exactOnly) {
-                // Exact anagram — must use all letters
-                if (word.length !== rawInput.length) continue;
-                const wordSorted = word.split('').sort().join('');
-                if (wordSorted === inputSorted) {
-                    results.push(word);
-                }
-            } else {
-                // Partial — word can use subset of letters
-                if (canMakeWord(word, rawInput)) {
-                    results.push(word);
-                }
+            // Exact anagram — must use all letters (wildcards count toward length)
+            if (exactOnly && word.length !== rawInput.length) continue;
+
+            // Letters not covered by the pool must be covered by wildcards
+            if (countMissingLetters(word, availableCounts) <= wildcards) {
+                results.push(word);
             }
         }
 
