@@ -141,13 +141,25 @@ function subtractLetters(pool, word) {
     return result;
 }
 
+// Letters that future stages still need from CARRY-OVER: each future
+// target's counts minus what that stage already supplies locally (its own
+// source words + random letters). A fully self-supplied future stage
+// contributes nothing — leftover letters "for" it would end the puzzle as
+// excess.
 function getFutureLetterCountsForStage(stageIndex) {
     const counts = {};
     for (let i = stageIndex + 1; i < stages.length; i++) {
         const futureStage = stages[i];
         if (!futureStage.targetWord) continue;
-        for (const letter of futureStage.targetWord.toLowerCase()) {
-            counts[letter] = (counts[letter] || 0) + 1;
+        const targetCounts = getLetterCounts(futureStage.targetWord);
+        const localCounts = getLetterCounts(
+            futureStage.sourceWords.join('') + (futureStage.randomLetters || '')
+        );
+        for (const [letter, need] of Object.entries(targetCounts)) {
+            const unmet = need - (localCounts[letter] || 0);
+            if (unmet > 0) {
+                counts[letter] = (counts[letter] || 0) + unmet;
+            }
         }
     }
     return counts;
@@ -632,8 +644,11 @@ function removeStage(index) {
     // Update isFirst property
     stages.forEach((stage, i) => { stage.isFirst = i === 0; });
 
-    // Stage indices shifted: cached suggestions and in-flight searches
-    // reference the old layout, so drop them all.
+    // Stage indices shifted AND the future-target context changed: drop all
+    // cached suggestions, but remember which panels were open (tracked by
+    // stage object, since indices just moved) so they can re-search.
+    const openPanels = stages.filter(s => s.suggestionsOpen && s.currentMode)
+        .map(s => ({ stage: s, mode: s.currentMode }));
     invalidateAllStageSuggestions();
 
     // Re-derive every stage's letterPool / complete / remainingLetters
@@ -643,6 +658,20 @@ function removeStage(index) {
 
     targetWords = stages.map(s => s.targetWord);
     renderPuzzleBuilder();
+
+    reopenSuggestionPanels(openPanels);
+}
+
+// Re-run searches for panels that were open before a structural change
+// (stage removal/reorder). Entries carry the stage OBJECT because its index
+// may have changed; stages that no longer exist are skipped.
+function reopenSuggestionPanels(openPanels) {
+    openPanels.forEach(({ stage, mode }) => {
+        const newIndex = stages.indexOf(stage);
+        if (newIndex !== -1 && stage.targetWord) {
+            showSuggestions(newIndex, mode);
+        }
+    });
 }
 
 function updateTargetWord(index, value) {
@@ -668,6 +697,23 @@ function updateTargetWord(index, value) {
     recalculateStageChainFrom(index);
 
     renderPuzzleBuilder();
+
+    // Earlier stages' open suggestion panels depend on FUTURE targets too
+    // (letter highlighting, No Excess filter, best-match scoring), so a
+    // target edit must also re-search panels open on stages before it.
+    refreshOpenSuggestionPanelsBefore(index);
+}
+
+// Re-run the suggestion search for any open panel on stages 0..endIndex-1.
+// Used when a later stage's target changes: those panels' results were
+// scored and filtered against the old future-letter context.
+function refreshOpenSuggestionPanelsBefore(endIndex) {
+    for (let i = 0; i < Math.min(endIndex, stages.length); i++) {
+        const stage = stages[i];
+        if (stage.suggestionsOpen && stage.currentMode && stage.targetWord) {
+            showSuggestions(i, stage.currentMode);
+        }
+    }
 }
 
 // Initialize with 2 empty stages
@@ -1066,8 +1112,10 @@ function setupContainerDragDrop(container) {
                 stages[i].isFirst = false;
             }
 
-            // Stage indices shifted: cached suggestions and in-flight
-            // searches reference the old order, so drop them all.
+            // Stage indices shifted AND the future-target context changed:
+            // drop cached suggestions, but let open panels re-search.
+            const openPanels = stages.filter(s => s.suggestionsOpen && s.currentMode)
+                .map(s => ({ stage: s, mode: s.currentMode }));
             invalidateAllStageSuggestions();
 
             // Fully recalculate the stage chain from scratch
@@ -1076,6 +1124,8 @@ function setupContainerDragDrop(container) {
             targetWords = stages.map(s => s.targetWord);
 
             renderPuzzleBuilder();
+
+            reopenSuggestionPanels(openPanels);
         } else {
             cleanupDrag();
         }
@@ -1308,18 +1358,8 @@ function sortByBestMatch(combinations, targetWord, existingLetters, stageIndex) 
         }
     }
 
-    // Get future target words (if stageIndex is provided)
-    const futureCounts = {};
-    if (stageIndex !== undefined) {
-        for (let i = stageIndex + 1; i < stages.length; i++) {
-            if (stages[i].targetWord) {
-                const futureTargetCounts = getLetterCounts(stages[i].targetWord);
-                for (const [letter, count] of Object.entries(futureTargetCounts)) {
-                    futureCounts[letter] = (futureCounts[letter] || 0) + count;
-                }
-            }
-        }
-    }
+    // Unmet future carry-over needs (same source of truth as the filters)
+    const futureCounts = stageIndex !== undefined ? getFutureLetterCountsForStage(stageIndex) : {};
 
     // Score each combination
     const scored = combinations.map(comboObj => {
@@ -1653,13 +1693,10 @@ function renderSuggestions(stageIndex, mode) {
         // Get current target word letters
         const targetLetters = new Set(stage.targetWord.toLowerCase().split(''));
 
-        // Get subsequent target words letters
-        const futureLetters = new Set();
-        for (let i = stageIndex + 1; i < stages.length; i++) {
-            if (stages[i].targetWord) {
-                stages[i].targetWord.toLowerCase().split('').forEach(letter => futureLetters.add(letter));
-            }
-        }
+        // Green = letters a future stage still needs from carry-over.
+        // A letter of an already-supplied future target shows red: it
+        // would end the puzzle as excess, matching the No Excess filter.
+        const futureLetters = new Set(Object.keys(getFutureLetterCountsForStage(stageIndex)));
 
         return word.split('').map(letter => {
             const lowerLetter = letter.toLowerCase();
@@ -1836,6 +1873,11 @@ function autoValidateStage(stageIndex) {
             stage.suggestionsOpen = wasOpen;
         }
     }
+
+    // Earlier stages' panels depend on future stages' UNMET needs, which
+    // just changed too (words/letters added here reduce what this stage
+    // needs from carry-over).
+    refreshOpenSuggestionPanelsBefore(stageIndex);
 }
 
 function validateStage(stageIndex) {
