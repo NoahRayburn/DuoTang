@@ -5,6 +5,8 @@ let wordFinderState = {
     inputLetters: '',
     currentResults: [],
     resultsShown: 0,
+    wildcards: 0,
+    availableCounts: {},
     initialized: false
 };
 
@@ -64,6 +66,8 @@ function wordFinderSearch() {
         const results = [];
         const wildcards = (rawInput.match(/\?/g) || []).length;
         const availableCounts = getLetterCounts(rawInput.replace(/\?/g, ''));
+        wordFinderState.wildcards = wildcards;
+        wordFinderState.availableCounts = availableCounts;
 
         for (const word of currentWordList) {
             if (word.length < minLength || word.length > maxLength) continue;
@@ -100,6 +104,22 @@ function wordFinderSearch() {
     }, 10);
 }
 
+// Wrap the letters that a wildcard tile filled in a highlight span.
+// Greedy left-to-right: each letter consumes from the real-letter pool;
+// once a letter's pool runs out, remaining occurrences came from a '?'.
+function wordFinderHighlightWildcards(word) {
+    if (wordFinderState.wildcards === 0) return word;
+    const pool = { ...wordFinderState.availableCounts };
+    return word.split('').map(char => {
+        const key = char.toLowerCase();
+        if (pool[key] > 0) {
+            pool[key]--;
+            return char;
+        }
+        return `<span class="wf-wild-letter">${char}</span>`;
+    }).join('');
+}
+
 function wordFinderRenderResults() {
     const resultsDiv = document.getElementById('word-finder-results');
     const results = wordFinderState.currentResults;
@@ -109,7 +129,7 @@ function wordFinderRenderResults() {
     const batch = results.slice(startIndex, endIndex);
 
     const itemsHTML = batch.map(word => {
-        return `<div class="suggestion-item" style="cursor: default;">${word}</div>`;
+        return `<div class="suggestion-item" style="cursor: default;">${wordFinderHighlightWildcards(word)}</div>`;
     }).join('');
 
     const hasMore = endIndex < results.length;
