@@ -141,13 +141,22 @@ function subtractLetters(pool, word) {
     return result;
 }
 
+// Each stage gets a fixed color (by absolute stage index, cycling past the
+// palette). Suggestion letters, stage number badges, and the legend all use
+// the same color so a letter visually points at the stage that will use it.
+// Red (#dc2626) is reserved for "no stage needs this" — keep it out of here.
+const STAGE_COLORS = ['#15803d', '#2563eb', '#9333ea', '#0e7490', '#b45309', '#be185d', '#4d7c0f'];
+function getStageColor(stageIndex) {
+    return STAGE_COLORS[stageIndex % STAGE_COLORS.length];
+}
+
 // Letters that future stages still need from CARRY-OVER: each future
 // target's counts minus what that stage already supplies locally (its own
 // source words + random letters). A fully self-supplied future stage
 // contributes nothing — leftover letters "for" it would end the puzzle as
-// excess.
-function getFutureLetterCountsForStage(stageIndex) {
-    const counts = {};
+// excess. Returns one entry per future stage with unmet needs, in order.
+function getFutureNeedsByStage(stageIndex) {
+    const result = [];
     for (let i = stageIndex + 1; i < stages.length; i++) {
         const futureStage = stages[i];
         if (!futureStage.targetWord) continue;
@@ -155,11 +164,26 @@ function getFutureLetterCountsForStage(stageIndex) {
         const localCounts = getLetterCounts(
             futureStage.sourceWords.join('') + (futureStage.randomLetters || '')
         );
+        const counts = {};
         for (const [letter, need] of Object.entries(targetCounts)) {
             const unmet = need - (localCounts[letter] || 0);
             if (unmet > 0) {
-                counts[letter] = (counts[letter] || 0) + unmet;
+                counts[letter] = unmet;
             }
+        }
+        if (Object.keys(counts).length > 0) {
+            result.push({ stageIndex: i, counts });
+        }
+    }
+    return result;
+}
+
+// Aggregate view of the same math, used by the search and filters.
+function getFutureLetterCountsForStage(stageIndex) {
+    const counts = {};
+    for (const entry of getFutureNeedsByStage(stageIndex)) {
+        for (const [letter, unmet] of Object.entries(entry.counts)) {
+            counts[letter] = (counts[letter] || 0) + unmet;
         }
     }
     return counts;
@@ -822,6 +846,12 @@ function createStageElement(stage, index) {
     const filters = getStageFilters(stage);
     const statusClass = stage.complete ? 'complete' : 'incomplete';
     const statusText = stage.complete ? 'Complete' : 'Incomplete';
+    // Stage number badge doubles as the color key for suggestion letters:
+    // outline = incomplete, filled = complete, always in the stage's color.
+    const stageColor = getStageColor(index);
+    const badgeStyle = stage.complete
+        ? `background: ${stageColor}; border-color: ${stageColor};`
+        : `color: ${stageColor}; border-color: ${stageColor};`;
     const startingLettersSection = stage.targetWord && stage.isFirst ? buildLetterPoolSection(stage, index, 'Starting letters') : '';
     const availableLettersSection = stage.targetWord && !stage.isFirst ? buildLetterPoolSection(stage, index, 'Available') : '';
 
@@ -842,7 +872,7 @@ function createStageElement(stage, index) {
             ${index > 0 && stages[index - 1].complete && stages[index - 1].remainingLetters ? `
                 <button class="btn btn-secondary btn-small" onclick="showTargetSuggestions(${index})" title="Suggest target words" style="padding: 4px 8px;">💡</button>
             ` : ''}
-            <span class="stage-status ${statusClass}" style="font-size: 12px;">${index + 1}</span>
+            <span class="stage-status ${statusClass}" style="font-size: 12px; ${badgeStyle}" title="Stage ${index + 1} (${statusText})">${index + 1}</span>
             <button class="btn btn-secondary btn-small" onclick="removeStage(${index})" title="Remove stage" style="padding: 4px 8px;">✕</button>
         </div>
         <div id="target-suggestions-popover-${index}" style="display: none; position: relative; margin-bottom: 12px; background: white; border: 3px solid var(--persian-green); border-radius: 12px; padding: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 100;"></div>
@@ -936,10 +966,12 @@ function createStageElement(stage, index) {
                             <button class="btn btn-secondary btn-small" onclick="hideSuggestions(${index})" style="padding: 4px 8px; font-size: 11px;">Hide</button>
                         </div>
                     </div>
-                    <div style="display: flex; gap: 12px; margin-bottom: 8px; font-size: 10px; color: #666; padding: 6px 8px; background: #fef9f0; border-radius: 8px; border: 2px solid #e0e0e0;">
+                    <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; font-size: 10px; color: #666; padding: 6px 8px; background: #fef9f0; border-radius: 8px; border: 2px solid #e0e0e0;">
                         <span style="font-weight: 600;">Legend:</span>
                         <span><span style="color: black; font-weight: 700;">Black</span> = Current target</span>
-                        <span><span style="color: #15803d; font-weight: 700;">Green</span> = Future target</span>
+                        ${getFutureNeedsByStage(index).map(entry => `
+                            <span><span style="color: ${getStageColor(entry.stageIndex)}; font-weight: 700;">Stage ${entry.stageIndex + 1}</span> = ${escHtml(stages[entry.stageIndex].targetWord.toUpperCase())}</span>
+                        `).join('')}
                         <span><span style="color: #dc2626; font-weight: 700;">Red</span> = Not needed</span>
                     </div>
                     <div id="suggestions-list-${index}" class="suggestions-list"></div>
@@ -1688,29 +1720,37 @@ function renderSuggestions(stageIndex, mode) {
     }
     headerText += ` <span style="font-weight: 400; color: #888;">(${activeListName} list · ${activeListSize.toLocaleString()} words)</span>`;
 
-    // Helper function to highlight letters by relevance
-    const highlightWord = (word) => {
-        // Get current target word letters
-        const targetLetters = new Set(stage.targetWord.toLowerCase().split(''));
+    // Highlight letters by the stage that will use them. Letters a future
+    // stage still needs from carry-over get that stage's color (a letter of
+    // an already-supplied future target shows red: it would end the puzzle
+    // as excess, matching the No Excess filter). Allocation is count-aware
+    // per combination: each occurrence claims the earliest future stage
+    // with an unmet need for it, so two E's can point at two different
+    // stages, and occurrences beyond every stage's need show red.
+    const targetLetters = new Set(stage.targetWord.toLowerCase().split(''));
+    const futureNeedsByStage = getFutureNeedsByStage(stageIndex);
 
-        // Green = letters a future stage still needs from carry-over.
-        // A letter of an already-supplied future target shows red: it
-        // would end the puzzle as excess, matching the No Excess filter.
-        const futureLetters = new Set(Object.keys(getFutureLetterCountsForStage(stageIndex)));
-
-        return word.split('').map(letter => {
+    const makeComboHighlighter = () => {
+        const remaining = futureNeedsByStage.map(entry => ({
+            stageIndex: entry.stageIndex,
+            counts: { ...entry.counts }
+        }));
+        return (word) => word.split('').map(letter => {
             const lowerLetter = letter.toLowerCase();
 
             if (targetLetters.has(lowerLetter)) {
                 // Letter appears in current target word - normal black
                 return `<span style="color: black;">${letter}</span>`;
-            } else if (futureLetters.has(lowerLetter)) {
-                // Letter appears in subsequent target words - green
-                return `<span style="color: #15803d; font-weight: 700;">${letter}</span>`;
-            } else {
-                // Letter doesn't appear in any target word - red
-                return `<span style="color: #dc2626; font-weight: 700;">${letter}</span>`;
             }
+            for (const entry of remaining) {
+                if (entry.counts[lowerLetter] > 0) {
+                    entry.counts[lowerLetter]--;
+                    const futureTarget = stages[entry.stageIndex].targetWord;
+                    return `<span style="color: ${getStageColor(entry.stageIndex)}; font-weight: 700;" title="Needed in stage ${entry.stageIndex + 1}: ${escHtml(futureTarget.toUpperCase())}">${letter}</span>`;
+                }
+            }
+            // Letter no current or future target needs - red
+            return `<span style="color: #dc2626; font-weight: 700;">${letter}</span>`;
         }).join('');
     };
 
@@ -1719,6 +1759,7 @@ function renderSuggestions(stageIndex, mode) {
         const warningIcon = comboObj.complete ? '' : '<span style="color: var(--burnt-sienna); margin-right: 4px;" title="Incomplete - missing some letters">⚠️</span>';
 
         if (comboObj.words.length > 0) {
+            const highlightWord = makeComboHighlighter();
             comboText = comboObj.words.map(word => highlightWord(word)).join(' + ');
         } else {
             comboText = '(use available letters only)';
@@ -1957,14 +1998,14 @@ function updateSummary() {
         if (stage.complete) {
             html += `
                 <div style="margin-bottom: 16px; padding: 12px; background: #f0f0f0; border-radius: 6px;">
-                    <strong>Stage ${index + 1}:</strong> ${stage.sourceWords.join(' + ')} → <strong>${stage.targetWord.toUpperCase()}</strong><br>
+                    <strong style="color: ${getStageColor(index)};">Stage ${index + 1}:</strong> ${stage.sourceWords.join(' + ')} → <strong>${stage.targetWord.toUpperCase()}</strong><br>
                     ${stage.remainingLetters ? `<span style="color: #666;">Remaining: ${stage.remainingLetters.toUpperCase()}</span>` : '<span style="color: #28a745;">No letters remaining</span>'}
                 </div>
             `;
         } else {
             html += `
                 <div style="margin-bottom: 16px; padding: 12px; background: #fff3cd; border-radius: 6px;">
-                    <strong>Stage ${index + 1}:</strong> ${stage.targetWord.toUpperCase()} <span style="color: #856404;">(not yet configured)</span>
+                    <strong style="color: ${getStageColor(index)};">Stage ${index + 1}:</strong> ${stage.targetWord.toUpperCase()} <span style="color: #856404;">(not yet configured)</span>
                 </div>
             `;
         }
