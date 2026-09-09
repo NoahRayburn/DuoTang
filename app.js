@@ -1974,6 +1974,45 @@ function showMessage(stageIndex, message, type) {
     }, 5000);
 }
 
+// Returns the letters a stage starts with, split into letters carried over
+// from the previous stage and the loose letters given at this stage.
+// Shared by the summary panel and sharePuzzle() so both stay in sync.
+function getStageLetterSources(index) {
+    const stage = stages[index];
+    if (!stage) return { carryOver: '', given: '' };
+
+    const given = stage.randomLetters || '';
+
+    if (index === 0) {
+        // Multiset subtraction: only remove as many copies of a letter
+        // as randomLetters actually contains.
+        const carryOver = stage.letterPool ? subtractLetters(stage.letterPool, given) : '';
+        return { carryOver, given };
+    }
+
+    const prevStage = stages[index - 1];
+    return { carryOver: (prevStage && prevStage.remainingLetters) || '', given };
+}
+
+// Renders a stage's starting letters for the summary panel: letters carried
+// over from the previous stage plus the loose letters given at this stage.
+function formatStageLettersHTML(index) {
+    const label = index === 0 ? 'Starting letters' : 'Letters';
+    const { carryOver, given } = getStageLetterSources(index);
+
+    if (!carryOver && !given) return '';
+
+    const parts = [];
+    if (carryOver) {
+        parts.push(`<span style="color: #666;">${carryOver.toUpperCase()}</span>`);
+    }
+    if (given) {
+        parts.push(`<span style="color: #b8651b;">${given.toUpperCase()} (given)</span>`);
+    }
+
+    return `<span style="color: #666;">${label}: </span>${parts.join('<span style="color: #666;"> + </span>')}<br>`;
+}
+
 function updateSummary() {
     const summaryPanel = document.getElementById('puzzle-summary');
     const summaryDiv = document.getElementById('summary-content');
@@ -1999,13 +2038,15 @@ function updateSummary() {
             html += `
                 <div style="margin-bottom: 16px; padding: 12px; background: #f0f0f0; border-radius: 6px;">
                     <strong style="color: ${getStageColor(index)};">Stage ${index + 1}:</strong> ${stage.sourceWords.join(' + ')} → <strong>${stage.targetWord.toUpperCase()}</strong><br>
+                    ${formatStageLettersHTML(index)}
                     ${stage.remainingLetters ? `<span style="color: #666;">Remaining: ${stage.remainingLetters.toUpperCase()}</span>` : '<span style="color: #28a745;">No letters remaining</span>'}
                 </div>
             `;
         } else {
             html += `
                 <div style="margin-bottom: 16px; padding: 12px; background: #fff3cd; border-radius: 6px;">
-                    <strong style="color: ${getStageColor(index)};">Stage ${index + 1}:</strong> ${stage.targetWord.toUpperCase()} <span style="color: #856404;">(not yet configured)</span>
+                    <strong style="color: ${getStageColor(index)};">Stage ${index + 1}:</strong> ${stage.targetWord.toUpperCase()} <span style="color: #856404;">(not yet configured)</span><br>
+                    ${formatStageLettersHTML(index)}
                 </div>
             `;
         }
@@ -2043,32 +2084,16 @@ function sharePuzzle() {
         shareText += `Stage ${stageNum}: ${stage.targetWord.toUpperCase()}\n`;
 
         // Show starting letters or carry-over letters
-        if (index === 0 && stage.letterPool) {
-            // First stage - show which letters you start with.
-            // Multiset subtraction: only remove as many copies of a letter
-            // as randomLetters actually contains.
-            const carryOver = subtractLetters(stage.letterPool, stage.randomLetters || '');
-            const given = stage.randomLetters || '';
+        if ((index === 0 && stage.letterPool) || index > 0) {
+            const label = index === 0 ? 'Starting letters' : 'Letters';
+            const { carryOver, given } = getStageLetterSources(index);
 
             if (carryOver && given) {
-                shareText += `  Starting letters: ${carryOver.toUpperCase()} + ${given.toUpperCase()} (given)\n`;
+                shareText += `  ${label}: ${carryOver.toUpperCase()} + ${given.toUpperCase()} (given)\n`;
             } else if (given) {
-                shareText += `  Starting letters: ${given.toUpperCase()} (given)\n`;
+                shareText += `  ${label}: ${given.toUpperCase()} (given)\n`;
             } else if (carryOver) {
-                shareText += `  Starting letters: ${carryOver.toUpperCase()}\n`;
-            }
-        } else if (index > 0) {
-            // Other stages - show carry-over and any added letters
-            const prevStage = stages[index - 1];
-            const carryOver = prevStage.remainingLetters || '';
-            const added = stage.randomLetters || '';
-
-            if (carryOver && added) {
-                shareText += `  Letters: ${carryOver.toUpperCase()} + ${added.toUpperCase()} (given)\n`;
-            } else if (added) {
-                shareText += `  Letters: ${added.toUpperCase()} (given)\n`;
-            } else if (carryOver) {
-                shareText += `  Letters: ${carryOver.toUpperCase()}\n`;
+                shareText += `  ${label}: ${carryOver.toUpperCase()}\n`;
             }
         }
 
